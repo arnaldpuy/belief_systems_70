@@ -1,8 +1,41 @@
-## ----setup, include=FALSE--------------------------------------------------------------------------
+---
+title: "Irrigation's real impact on global water and food security"
+subtitle: "R code"
+author: "Arnald Puy"
+header-includes:
+  - \usepackage[font=footnotesize]{caption}
+  - \usepackage{dirtytalk}
+  - \usepackage{booktabs}
+  - \usepackage{tabulary}
+  - \usepackage{enumitem}
+  - \usepackage{lmodern}
+  - \usepackage{amsmath}
+  - \usepackage{mathtools}
+  - \usepackage[T1]{fontenc}
+  - \usepackage{tikz}
+output:
+  pdf_document:
+    fig_caption: yes
+    number_sections: yes
+    toc: yes
+    toc_depth: 2
+    keep_tex: true
+  word_document:
+    toc: no
+    toc_depth: '2'
+  html_document:
+    keep_md: true
+link-citations: yes
+fontsize: 11pt
+---
+
+```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE)
+```
 
+\newpage
 
-## ----preliminary, warning=FALSE--------------------------------------------------------------------
+```{r preliminary, warning=FALSE, message=FALSE}
 
 #   PRELIMINARY FUNCTIONS ######################################################
 
@@ -29,9 +62,11 @@ theme_AP <- function() {
           legend.key.height = unit(0.4, "cm"), 
           legend.title = element_text(size = 9)) 
 }
+```
 
+\newpage
 
-## ----load_and_read, warning=FALSE------------------------------------------------------------------
+```{r load_and_read, warning=FALSE}
 
 # CREATION OF VECTORS WITH NAMES ###############################################
 
@@ -149,9 +184,11 @@ for (i in names(final.dt)) {
   write.xlsx(final.dt[[i]][, .(doi, year, title, abstract, location.belief.system)], 
              paste("final.dt", names(final.dt[i]), "xlsx", sep = "."))
 }
+```
 
+# Abstract corpus
 
-## ----abstract_corpus-------------------------------------------------------------------------------
+```{r abstract_corpus}
 
 final.dt.water.screened <- data.table(read.xlsx("final.dt.water_screened.xlsx"))
 final.dt.food.screened <- data.table(read.xlsx("final.dt.food_screened.xlsx"))
@@ -171,9 +208,11 @@ for (i in names(screened.dt)) {
     write.xlsx(., paste("abstract.corpus", i, "xlsx", sep = "."))
   
 }
+```
 
+# Full text corpus
 
-## ----full_text_corpus------------------------------------------------------------------------------
+```{r full_text_corpus}
 
 # LOAD IN DIMENSIONS DATASET (FULL TEXT) #######################################
 
@@ -234,9 +273,12 @@ for (i in c("water", "food")) {
   full.text.sampled[topic == i] %>%
     write.xlsx(paste("full.text.corpus", i, "xlsx", sep = "."))
 }
+```
 
 
-## ----policy_corpus, dependson="full_text_corpus"---------------------------------------------------
+# Policy corpus
+
+```{r policy_corpus, dependson="full_text_corpus"}
 
 # LOAD IN DIMENSIONS DATASETS (POLICY TEXT) ####################################
 
@@ -265,9 +307,11 @@ for (i in c("water", "food")) {
   matching.rows.policy[topic == i] %>%
     write.xlsx(paste("policy.corpus", i, "xlsx", sep = "."))
 }
+```
 
+# Split datasets for analysis
 
-## ----split-----------------------------------------------------------------------------------------
+```{r split}
 
 # SPLIT THE DATASET INTO N FOR RESEARCH ########################################
 
@@ -319,9 +363,9 @@ for (i in 1:length(survey.dt.split)) {
              file = paste0(names(survey.dt.split)[i], ".dt", ".xlsx"))
   
 }
+```
 
-
-## ----preliminary_analysis_abstract_water-----------------------------------------------------------
+```{r preliminary_analysis_abstract_water}
 
 # CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
 
@@ -354,9 +398,9 @@ abstract.water.dt <- merge(tmp[[1]][claim.in.text == "F"], tmp[[2]], by = c("doi
 abstract.water.dt[, claim.in.text:= ifelse(is.na(claim.in.text), "TRUE", "FALSE")]
 abstract.water.dt[, c(cols_of_interest, "nature.claim"):= lapply(.SD, trimws), .SDcols = c(cols_of_interest, "nature.claim")]
 abstract.water.dt[, year:= ifelse(is.na(year), as.numeric(gsub("\\D", "", abstract.water.dt$author)), year)]
+```
 
-
-## ----plot_bars, dependson="preliminary_analysis_abstract_water", fig.height=2.5, fig.width=4, warning=FALSE----
+```{r plot_bars, dependson="preliminary_analysis_abstract_water", fig.height=2.5, fig.width=4, warning=FALSE}
 
 # PRELIMINARY ANALYSIS #########################################################
 
@@ -378,9 +422,9 @@ b <- tmp$NETWORK %>%
   theme_AP()
 
 plot_grid(a, b, ncol = 2)
+```
 
-
-## ----network_analysis_water_abstract---------------------------------------------------------------
+```{r network_analysis_water_abstract}
 
 # NETWORK ANALYSIS #############################################################
 
@@ -400,7 +444,6 @@ citation_graph <- graph_from_data_frame(d = network.dt.complete, directed = TRUE
 # Calculate network metrics ----------------------------------------------------
 
 edge_density(citation_graph)
-
 network_metrics <- data.table(node = V(citation_graph)$name,
                               
                               # Degree of a node: The number of connections or 
@@ -430,9 +473,9 @@ network_metrics <- data.table(node = V(citation_graph)$name,
 network_metrics[order(-degree)][1:5]
 network_metrics[order(-betweenness)][1:5]
 network_metrics[order(-closeness)][1:5]
+```
 
-
-## ----plot_network_water_abstract, dependson="network_analysis_water_abstract", dev = "pdf", fig.height=8.5, fig.width=7----
+```{r plot_network_water_abstract, dependson="network_analysis_water_abstract", dev = "pdf", fig.height=8.5, fig.width=7}
 
 # PLOT NETWORK #################################################################
 
@@ -476,9 +519,13 @@ ggraph(graph, layout = "igraph", algorithm = "nicely") +
         axis.text.y = element_blank(), 
         axis.ticks.y = element_blank(), 
         legend.position = "top") 
+```
 
+\newpage
 
-## ----session_information---------------------------------------------------------------------------
+# Session information
+
+```{r session_information}
 
 # SESSION INFORMATION ##########################################################
 
@@ -492,4 +539,4 @@ cat("Num cores:   "); print(detectCores(logical = FALSE))
 
 ## Return number of threads
 cat("Num threads: "); print(detectCores(logical = FALSE))
-
+```
