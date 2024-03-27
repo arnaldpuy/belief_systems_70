@@ -328,7 +328,7 @@ for (i in 1:length(survey.dt.split)) {
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
 cols_of_interest <- c("title", "author", "claim", "citation")
-files.abstract.water <- paste(paste("abstract.corpus.water2_", names.files, sep = ""), "xlsx", sep = ".")
+files.abstract.water <- paste(paste("abstract.corpus.water_", names.files, sep = ""), "xlsx", sep = ".")
 
 # READ IN DATASETS AND TURN TO LOWERCAPS #######################################
 
@@ -355,7 +355,6 @@ abstract.water.dt[, claim.in.text:= ifelse(is.na(claim.in.text), "TRUE", "FALSE"
 abstract.water.dt[, c(cols_of_interest, "nature.claim"):= lapply(.SD, trimws), .SDcols = c(cols_of_interest, "nature.claim")]
 abstract.water.dt[, year:= ifelse(is.na(year), as.numeric(gsub("\\D", "", abstract.water.dt$author)), year)]
 
-
 ## ----plot_bars, dependson="preliminary_analysis_abstract_water", fig.height=2.5, fig.width=4, warning=FALSE----
 
 # PRELIMINARY ANALYSIS #########################################################
@@ -377,7 +376,15 @@ b <- tmp$NETWORK %>%
   labs(x = "", y = "") +
   theme_AP()
 
-plot_grid(a, b, ncol = 2)
+c <- tmp$NETWORK %>%
+  .[, .N, document.type] %>%
+  ggplot(., aes(reorder(document.type, -N), N)) +
+  geom_bar(stat = "identity") + 
+  scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+  labs(x = "", y = "") +
+  theme_AP()
+
+plot_grid(a, b, c, ncol = 3)
 
 
 ## ----network_analysis_water_abstract---------------------------------------------------------------
@@ -386,6 +393,17 @@ plot_grid(a, b, ncol = 2)
 
 # Arrange data -----------------------------------------------------------------
 network.dt <- copy(tmp$NETWORK)
+
+# Remove the year from mentions to FAO Aquastat --------------------------------
+
+pattern <- "\\b(?:19|20)\\d{2}\\b"  # Matches years between 1900 and 2099
+
+for (col in c("citation", "author")) {
+  matches <- grepl("^fao aquastat\\s+\\d+$", network.dt[[col]], ignore.case = TRUE)
+  network.dt[matches, (col) := gsub("\\d+", "", network.dt[[col]][matches], perl = TRUE)]
+  network.dt[, (col) := trimws(network.dt[[col]])]
+}
+
 setnames(network.dt, c("author", "citation"), c("from", "to"))
 network.dt <- network.dt[, .(from, to, document.type, nature.claim)]
 cols_to_change <- colnames(network.dt)
@@ -400,6 +418,13 @@ citation_graph <- graph_from_data_frame(d = network.dt.complete, directed = TRUE
 # Calculate network metrics ----------------------------------------------------
 
 edge_density(citation_graph)
+
+# Modularity: 
+# - c.1: Strong community structure, where nodes within groups are highly connected.
+# - c. -1: Opposite of community structure, where nodes between groups are more connected.
+# - c. 0: Indicates absence of community structure or anti-community structure in the network.
+wtc <- cluster_walktrap(citation_graph)
+modularity(wtc)
 
 network_metrics <- data.table(node = V(citation_graph)$name,
                               
@@ -493,3 +518,10 @@ cat("Num cores:   "); print(detectCores(logical = FALSE))
 ## Return number of threads
 cat("Num threads: "); print(detectCores(logical = FALSE))
 
+
+
+
+
+
+#dois <- na.omit(tmp$NETWORK$doi)
+#cr_citation_count(doi = dois)

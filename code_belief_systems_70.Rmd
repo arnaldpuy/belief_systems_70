@@ -41,7 +41,7 @@ knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE)
 
 sensobol::load_packages(c("openxlsx", "data.table", "tidyverse", "bibliometrix", 
                           "igraph", "ggraph", "cowplot", "tidygraph", "benchmarkme", 
-                          "parallel"))
+                          "parallel", "wesanderson"))
 
 # Create custom theme
 theme_AP <- function() {
@@ -400,7 +400,7 @@ abstract.water.dt[, c(cols_of_interest, "nature.claim"):= lapply(.SD, trimws), .
 abstract.water.dt[, year:= ifelse(is.na(year), as.numeric(gsub("\\D", "", abstract.water.dt$author)), year)]
 ```
 
-```{r plot_bars, dependson="preliminary_analysis_abstract_water", fig.height=2.5, fig.width=4, warning=FALSE}
+```{r plot_bars, dependson="preliminary_analysis_abstract_water", fig.height=2, fig.width=5.8, warning=FALSE}
 
 # PRELIMINARY ANALYSIS #########################################################
 
@@ -421,7 +421,14 @@ b <- tmp$NETWORK %>%
   labs(x = "", y = "") +
   theme_AP()
 
-plot_grid(a, b, ncol = 2)
+c <- tmp$NETWORK %>%
+  .[, .N, document.type] %>%
+  ggplot(., aes(reorder(document.type, -N), N)) +
+  geom_bar(stat = "identity") + 
+  labs(x = "", y = "") +
+  theme_AP()
+
+plot_grid(a, b, c, ncol = 3)
 ```
 
 ```{r network_analysis_water_abstract}
@@ -519,6 +526,47 @@ ggraph(graph, layout = "igraph", algorithm = "nicely") +
         axis.text.y = element_blank(), 
         axis.ticks.y = element_blank(), 
         legend.position = "top") 
+```
+
+# Aquastat data
+
+```{r aquastat_data, fig.height=2, fig.width=2.2}
+
+# AQUASTAT DATA ################################################################
+
+# Read in dataset --------------------------------------------------------------
+
+aquastat <- data.table(read.xlsx("aquastat_dt.xlsx"))
+aquastat.dt <- aquastat[Variable == "Agricultural water withdrawal as % of total water withdrawal"] %>%
+  .[, .(Area, Year, Value, Symbol)] %>%
+  .[Year == 2020] %>%
+  .[, Symbol:= ifelse(Symbol == "E", "estimated", "inputed")]
+
+# Count proportion of estimated and imputed values
+# E: Estimate either calculated as sum or identify (yield) from 
+# official values or from an AQUASTAT estimation.
+# I: Imputed (carry forward, vertical imputation, linear interpolation)
+
+# Calculate mean and median ----------------------------------------------------
+
+mean.and.median <- aquastat.dt[, .(mean = mean(Value), median = median(Value))] %>%
+  melt(., measure.vars = colnames(.))
+  
+# Plot histogram ---------------------------------------------------------------
+
+a <- ggplot(aquastat.dt, aes(Value)) +
+  geom_histogram(color = "black", aes(fill = Symbol)) +
+  geom_vline(data = mean.and.median, aes(xintercept = value, color = variable), 
+             show.legend = FALSE) +
+  geom_vline(xintercept = 70, lty = 2) +
+  scale_fill_manual(name = "", 
+                    values = wes_palette(name = "Cavalcanti1", 5)) +
+  theme_AP() +
+  labs(x = "Percent (\\%)", y = "Count") +
+  theme(legend.position = "top")
+
+a
+
 ```
 
 \newpage
