@@ -8,7 +8,7 @@ knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE)
 
 sensobol::load_packages(c("openxlsx", "data.table", "tidyverse", "bibliometrix", 
                           "igraph", "ggraph", "cowplot", "tidygraph", "benchmarkme", 
-                          "parallel"))
+                          "parallel", "wesanderson"))
 
 # Create custom theme
 theme_AP <- function() {
@@ -525,3 +525,8 @@ cat("Num threads: "); print(detectCores(logical = FALSE))
 
 #dois <- na.omit(tmp$NETWORK$doi)
 #cr_citation_count(doi = dois)
+
+
+
+
+

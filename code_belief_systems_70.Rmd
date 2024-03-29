@@ -41,7 +41,7 @@ knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE)
 
 sensobol::load_packages(c("openxlsx", "data.table", "tidyverse", "bibliometrix", 
                           "igraph", "ggraph", "cowplot", "tidygraph", "benchmarkme", 
-                          "parallel", "wesanderson"))
+                          "parallel", "wesanderson", "scales"))
 
 # Create custom theme
 theme_AP <- function() {
@@ -186,7 +186,9 @@ for (i in names(final.dt)) {
 }
 ```
 
-# Abstract corpus
+# Retrieve all corpus 
+
+## Abstract corpus
 
 ```{r abstract_corpus}
 
@@ -210,7 +212,7 @@ for (i in names(screened.dt)) {
 }
 ```
 
-# Full text corpus
+## Full text corpus
 
 ```{r full_text_corpus}
 
@@ -275,8 +277,7 @@ for (i in c("water", "food")) {
 }
 ```
 
-
-# Policy corpus
+## Policy corpus
 
 ```{r policy_corpus, dependson="full_text_corpus"}
 
@@ -364,6 +365,261 @@ for (i in 1:length(survey.dt.split)) {
   
 }
 ```
+
+# Network analysis
+
+```{r read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")}
+
+# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
+
+tmp <- list()
+names.files <- c("WORK", "NETWORK")
+topics <- c("water")
+corpus <- c("abstract.corpus", "policy.corpus") 
+cols_of_interest <- c("title", "author", "claim", "citation")
+
+# Paste all possible combinations of names -------------------------------------
+
+combs <- expand.grid(corpus = corpus, topics = topics, approach = names.files)
+all.files <- paste(paste(paste(combs$corpus, combs$topics, sep = "."), combs$approach, sep = "_"), 
+                   "xlsx", sep = ".")
+
+# READ IN DATASETS AND TURN TO LOWERCAPS #######################################
+
+tmp <- list()
+
+for (i in 1:length(all.files)) {
+  
+  tmp[[i]] <- data.table(read.xlsx(all.files[i]))
+  
+  if (!str_detect(all.files[i], "NETWORK")) { 
+    
+    tmp[[i]][, title:= tolower(title)]
+  } else {
+    
+    tmp[[i]][, (cols_of_interest):= lapply(.SD, tolower), .SDcols = (cols_of_interest)]
+  }
+}
+
+names(tmp) <- all.files
+
+
+# CLEAN AND MERGE DATASETS #####################################################
+
+dataset.networks <- all.files[str_detect(all.files, "NETWORK")]
+network.dt <- tmp[dataset.networks] %>%
+  rbindlist() %>%
+  .[, policy:= grepl("^policy", doi)]
+
+network.dt[, author:= ifelse(policy == TRUE, doi, author)]
+
+# Remove the year from mentions to FAO Aquastat --------------------------------
+
+pattern <- "\\b(?:19|20)\\d{2}\\b"  # Matches years between 1900 and 2099
+
+for (col in c("citation", "author")) {
+  matches <- grepl("^fao aquastat\\s+\\d+$", network.dt[[col]], ignore.case = TRUE)
+  network.dt[matches, (col) := gsub("\\d+", "", network.dt[[col]][matches], perl = TRUE)]
+  network.dt[, (col) := trimws(network.dt[[col]])]
+}
+
+# Change colun names -----------------------------------------------------------
+
+setnames(network.dt, c("author", "citation"), c("from", "to"))
+network.dt <- network.dt[, .(from, to, document.type, nature.claim)]
+cols_to_change <- colnames(network.dt)
+network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
+```
+
+```{r descriptive_plots, dependson="read_all_datasets", fig.height=1.8, fig.width=6.5}
+
+# PLOT DESCRIPTIVE STATISTICS ##################################################
+
+# Count document type by nature of claim ---------------------------------------
+
+a <- network.dt[, .N, .(nature.claim, document.type)] %>%
+  na.omit() %>%
+  ggplot(., aes(reorder(nature.claim, N), N)) +
+  coord_flip() +
+  geom_bar(stat = "identity") + 
+  facet_wrap(~document.type) +
+  scale_y_continuous(breaks = breaks_pretty(n = 2)) +
+  labs(x = "", y = "Counts") +
+  theme_AP()
+
+# Count how many documents make the claim and cite / do not cite, 
+# by document.type -------------------------------------------------------------
+
+b <- network.dt[, .(without.citation = sum(is.na(to)), 
+               with.citation = .N - sum(is.na(to))), document.type] %>%
+  melt(., measure.vars = c("without.citation", "with.citation")) %>%
+  ggplot(., aes(document.type, value)) +
+  geom_bar(stat = "identity") +
+  scale_y_continuous(breaks = breaks_pretty(n = 2)) +
+  scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+  labs(x = "", y = "Counts") +
+  facet_wrap(~variable) + 
+  theme_AP()
+
+
+# merge ------------------------------------------------------------------------
+
+plot_grid(a, b, ncol = 2, rel_widths = c(0.63, 0.37), labels = "auto")
+```
+
+## Network metrics
+
+```{r network_metrics, dependson="read_all_datasets"}
+
+# CALCULATE NETWORK METRICS ####################################################
+
+# only complete cases ----------------------------------------------------------
+network.dt.complete <- network.dt[complete.cases(network.dt$to), ]
+
+# Transform to graph -----------------------------------------------------------
+citation_graph <- graph_from_data_frame(d = network.dt.complete, directed = TRUE)
+
+# Calculate network metrics ----------------------------------------------------
+
+edge_density(citation_graph)
+
+# Modularity: 
+# - c.1: Strong community structure, where nodes within groups are highly connected.
+# - c. -1: Opposite of community structure, where nodes between groups are more connected.
+# - c. 0: Indicates absence of community structure or anti-community structure in the network.
+wtc <- cluster_walktrap(citation_graph)
+modularity(wtc)
+
+network_metrics <- data.table(node = V(citation_graph)$name,
+                              
+                              # Degree of a node: The number of connections or 
+                              # edges linked to that node. 
+                              # It represents how well-connected or central a 
+                              # node is within the graph.
+                              degree = degree(citation_graph, mode = "in"),
+                              
+                              # Betweenness centrality of a node: Measures the 
+                              # extent to which a node lies on the shortest 
+                              # paths between all pairs of other nodes in the graph. 
+                              # Nodes with high betweenness centrality act as 
+                              # bridges or intermediaries, facilitating 
+                              # communication and information flow between other nodes.
+                              betweenness = betweenness(citation_graph),
+                              
+                              # Closeness centrality of a node: Measures how 
+                              # close a node is to all other nodes in the graph, 
+                              # taking into account the length of the shortest paths. 
+                              # Nodes with high closeness centrality are able to 
+                              # efficiently communicate or interact with other 
+                              # nodes in the graph.
+                              closeness = closeness(citation_graph),
+                              pagerank = page_rank(citation_graph)$vector
+)
+
+degree.nodes <- network_metrics[order(-degree)][1:10]
+betweenness.nodes <- network_metrics[order(-betweenness)][1:10]
+pagerank.nodes <- network_metrics[order(-closeness)][1:10]
+
+degree.nodes
+betweenness.nodes
+pagerank.nodes
+```
+
+```{r add_features, dependson=c("read_all_datasets", "network_metrics")}
+
+# ADD FEATURES TO NODES ########################################################
+
+# Retrieve a vector with the node names ----------------------------------------
+
+graph <- tidygraph::as_tbl_graph(network.dt.complete, directed = TRUE) 
+vec.names <- graph %>%
+  activate(nodes) %>%
+  pull() %>%
+  data.table(name = .)
+
+# Merge with info from the network.dt ------------------------------------------
+
+vec.nature.claim <- merge(merge(vec.names, unique(network.dt[, .(from, nature.claim)]), 
+                                by.x = "name", by.y = "from", all.x = TRUE), 
+                          unique(network.dt[, .(from, document.type)]), 
+                          by.x = "name", by.y = "from", all.x = TRUE)
+
+# Merge with the correct order -------------------------------------------------
+
+order_indices <- match(vec.names$name, vec.nature.claim$name)
+final.vec.nature.claim <- vec.nature.claim[order_indices, ] %>%
+  .[, nature.claim] 
+final.vec.document.type <- vec.nature.claim[order_indices, ] %>%
+  .[, document.type] 
+
+# Attach to the graph ----------------------------------------------------------
+
+graph <- graph %>%
+  activate(nodes) %>%
+  mutate(nature.claim = final.vec.nature.claim, 
+         document.type = final.vec.document.type, 
+         degree = network_metrics$degree, 
+         betweenness = network_metrics$betweenness, 
+         pagerank = network_metrics$pagerank)
+```
+
+```{r plot_network, dependson="add_features", fig.height=5, fig.width=5}
+
+# PLOT NETWORK #################################################################
+
+seed <- 123
+
+# by nature of claim -----------------------------------------------------------
+
+set.seed(seed)
+
+ggraph(graph, layout = "igraph", algorithm = "nicely") + 
+  geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
+                 end_cap = circle(1, "mm")) + 
+  geom_node_point(aes(color = nature.claim, size = degree)) +
+  geom_node_text(aes(label = ifelse(degree >= min(degree.nodes$degree), name, NA)), 
+                 repel = TRUE, size = 2.2) +
+  labs(x = "", y = "") +
+  scale_color_manual(name = "", 
+                     values = wes_palette(name = "Cavalcanti1", 4)) +
+  theme_AP() + 
+  theme(axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank(), 
+        axis.text.y = element_blank(), 
+        axis.ticks.y = element_blank(), 
+        legend.position = "top") 
+
+# by document.type--------------------------------------------------------------
+
+set.seed(seed)
+
+ggraph(graph, layout = "igraph", algorithm = "nicely") + 
+  geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
+                 end_cap = circle(1, "mm")) + 
+  geom_node_point(aes(color = document.type, size = degree)) +
+  geom_node_text(aes(label = ifelse(degree >= min(degree.nodes$degree), name, NA)), 
+                 repel = TRUE, size = 2.2) +
+  labs(x = "", y = "") +
+  scale_color_discrete(name = "") +
+  theme_AP() + 
+  theme(axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank(), 
+        axis.text.y = element_blank(), 
+        axis.ticks.y = element_blank(), 
+        legend.position = "top") 
+```
+
+\newpage
+
+
+
+
+
+
+
+
+
+
 
 ```{r preliminary_analysis_abstract_water}
 
