@@ -375,7 +375,7 @@ for (i in 1:length(survey.dt.split)) {
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
 topics <- c("water")
-corpus <- c("abstract.corpus", "policy.corpus") 
+corpus <- c("abstract.corpus", "policy.corpus", "full.text.corpus") 
 cols_of_interest <- c("title", "author", "claim", "citation")
 
 # Paste all possible combinations of names -------------------------------------
@@ -423,9 +423,16 @@ for (col in c("citation", "author")) {
   network.dt[, (col) := trimws(network.dt[[col]])]
 }
 
-# Change colun names -----------------------------------------------------------
+# Rename columns ---------------------------------------------------------------
 
 setnames(network.dt, c("author", "citation"), c("from", "to"))
+
+# Create copy ------------------------------------------------------------------
+
+network.dt.claim <- copy(network.dt)
+
+# Convert all to lower caps ----------------------------------------------------
+
 network.dt <- network.dt[, .(from, to, document.type, nature.claim)]
 cols_to_change <- colnames(network.dt)
 network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
@@ -434,6 +441,13 @@ network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
 ```{r descriptive_plots, dependson="read_all_datasets", fig.height=1.8, fig.width=6.5}
 
 # PLOT DESCRIPTIVE STATISTICS ##################################################
+
+# Check proportio of studies making the claim but without providing any citation and 
+# not being primary papers (!modelling) ----------------------------------------
+
+no.citation.total <- nrow(network.dt.claim[nature.claim == "no citation" & 
+                                          !document.type == "modelling"])
+no.citation.total / nrow(network.dt.claim) 
 
 # Count document type by nature of claim ---------------------------------------
 
@@ -461,7 +475,6 @@ b <- network.dt[, .(without.citation = sum(is.na(to)),
   facet_wrap(~variable) + 
   theme_AP()
 
-
 # merge ------------------------------------------------------------------------
 
 plot_grid(a, b, ncol = 2, rel_widths = c(0.63, 0.37), labels = "auto")
@@ -474,9 +487,11 @@ plot_grid(a, b, ncol = 2, rel_widths = c(0.63, 0.37), labels = "auto")
 # CALCULATE NETWORK METRICS ####################################################
 
 # only complete cases ----------------------------------------------------------
+
 network.dt.complete <- network.dt[complete.cases(network.dt$to), ]
 
 # Transform to graph -----------------------------------------------------------
+
 citation_graph <- graph_from_data_frame(d = network.dt.complete, directed = TRUE)
 
 # Calculate network metrics ----------------------------------------------------
@@ -516,14 +531,19 @@ network_metrics <- data.table(node = V(citation_graph)$name,
                               pagerank = page_rank(citation_graph)$vector
 )
 
-degree.nodes <- network_metrics[order(-degree)][1:10]
-betweenness.nodes <- network_metrics[order(-betweenness)][1:10]
-pagerank.nodes <- network_metrics[order(-closeness)][1:10]
+# Define the max number of rows
+max.number <- 3
+
+degree.nodes <- network_metrics[order(-degree)][1:max.number]
+betweenness.nodes <- network_metrics[order(-betweenness)][1:max.number]
+pagerank.nodes <- network_metrics[order(-closeness)][1:max.number]
 
 degree.nodes
 betweenness.nodes
 pagerank.nodes
 ```
+
+## Network plots
 
 ```{r add_features, dependson=c("read_all_datasets", "network_metrics")}
 
@@ -563,7 +583,7 @@ graph <- graph %>%
          pagerank = network_metrics$pagerank)
 ```
 
-```{r plot_network, dependson="add_features", fig.height=5, fig.width=5}
+```{r plot_network, dependson="add_features", fig.height=5, fig.width=6.5}
 
 # PLOT NETWORK #################################################################
 
@@ -572,6 +592,8 @@ seed <- 123
 # by nature of claim -----------------------------------------------------------
 
 set.seed(seed)
+
+# Label the nodes with highest degree ------------------------------------------
 
 ggraph(graph, layout = "igraph", algorithm = "nicely") + 
   geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
@@ -587,7 +609,27 @@ ggraph(graph, layout = "igraph", algorithm = "nicely") +
         axis.ticks.x = element_blank(), 
         axis.text.y = element_blank(), 
         axis.ticks.y = element_blank(), 
-        legend.position = "top") 
+        legend.position = "right") 
+
+set.seed(seed)
+
+# Label the nodes with highest betweenness -------------------------------------
+
+ggraph(graph, layout = "igraph", algorithm = "nicely") + 
+  geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
+                 end_cap = circle(1, "mm")) + 
+  geom_node_point(aes(color = nature.claim, size = betweenness)) +
+  geom_node_text(aes(label = ifelse(betweenness >= min(betweenness.nodes$betweenness), name, NA)), 
+                 repel = TRUE, size = 2.2) +
+  labs(x = "", y = "") +
+  scale_color_manual(name = "", 
+                     values = wes_palette(name = "Cavalcanti1", 4)) +
+  theme_AP() + 
+  theme(axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank(), 
+        axis.text.y = element_blank(), 
+        axis.ticks.y = element_blank(), 
+        legend.position = "right") 
 
 # by document.type--------------------------------------------------------------
 
@@ -606,7 +648,27 @@ ggraph(graph, layout = "igraph", algorithm = "nicely") +
         axis.ticks.x = element_blank(), 
         axis.text.y = element_blank(), 
         axis.ticks.y = element_blank(), 
-        legend.position = "top") 
+        legend.position = "right") 
+
+# Label nodes that are modelling exercises -------------------------------------
+
+set.seed(seed)
+
+ggraph(graph, layout = "igraph", algorithm = "nicely") + 
+  geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
+                 end_cap = circle(1, "mm")) + 
+  geom_node_point(aes(color = nature.claim)) +
+  geom_node_text(aes(label = ifelse(nature.claim == "modelling", name, NA)), 
+                 repel = TRUE, size = 2.2) +
+  labs(x = "", y = "") +
+  scale_color_manual(name = "", 
+                     values = wes_palette(name = "Cavalcanti1", 4)) +
+  theme_AP() + 
+  theme(axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank(), 
+        axis.text.y = element_blank(), 
+        axis.ticks.y = element_blank(), 
+        legend.position = "right") 
 ```
 
 \newpage
