@@ -1,8 +1,8 @@
-## ----setup, include=FALSE-----------------------------------------------------------------------------
+## ----setup, include=FALSE----------------------------------------------------------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE)
 
 
-## ----preliminary, warning=FALSE, message=FALSE--------------------------------------------------------
+## ----preliminary, warning=FALSE, message=FALSE-------------------------------------------------------------------------------
 
 #   PRELIMINARY FUNCTIONS ######################################################
 
@@ -31,7 +31,7 @@ theme_AP <- function() {
 }
 
 
-## ----load_and_read, warning=FALSE---------------------------------------------------------------------
+## ----load_and_read, warning=FALSE--------------------------------------------------------------------------------------------
 
 # CREATION OF VECTORS WITH NAMES ###############################################
 
@@ -151,7 +151,7 @@ for (i in names(final.dt)) {
 }
 
 
-## ----abstract_corpus----------------------------------------------------------------------------------
+## ----abstract_corpus---------------------------------------------------------------------------------------------------------
 
 final.dt.water.screened <- data.table(read.xlsx("final.dt.water_screened.xlsx"))
 final.dt.food.screened <- data.table(read.xlsx("final.dt.food_screened.xlsx"))
@@ -173,7 +173,7 @@ for (i in names(screened.dt)) {
 }
 
 
-## ----full_text_corpus---------------------------------------------------------------------------------
+## ----full_text_corpus--------------------------------------------------------------------------------------------------------
 
 # LOAD IN DIMENSIONS DATASET (FULL TEXT) #######################################
 
@@ -236,7 +236,7 @@ for (i in c("water", "food")) {
 }
 
 
-## ----policy_corpus, dependson="full_text_corpus"------------------------------------------------------
+## ----policy_corpus, dependson="full_text_corpus"-----------------------------------------------------------------------------
 
 # LOAD IN DIMENSIONS DATASETS (POLICY TEXT) ####################################
 
@@ -267,7 +267,7 @@ for (i in c("water", "food")) {
 }
 
 
-## ----split--------------------------------------------------------------------------------------------
+## ----split-------------------------------------------------------------------------------------------------------------------
 
 # SPLIT THE DATASET INTO N FOR RESEARCH ########################################
 
@@ -321,9 +321,9 @@ for (i in 1:length(survey.dt.split)) {
 }
 
 
-## ----read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")----
+## ----read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")-------------------------
 
-# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
+# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ############################
 
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
@@ -366,6 +366,18 @@ network.dt <- tmp[dataset.networks] %>%
 
 network.dt[, author:= ifelse(policy == TRUE, doi, author)]
 
+# CHECK NUMBER OF FAO AQUASTAT CITES ###########################################
+
+network.dt[citation %like% "fao aquastat"] %>%
+  .[, .N, citation]
+
+# WRITE LOOKUP TABLE TO CHECK ALREADY RETRIEVED STUDIES ########################
+
+network.dt[, .(doi, title, author)] %>%
+  .[order(title)] %>%
+  unique(.) %>%
+  write.xlsx(., "lookup.dt.xlsx")
+
 # Remove the year from mentions to FAO Aquastat --------------------------------
 
 pattern <- "\\b(?:19|20)\\d{2}\\b"  # Matches years between 1900 and 2099
@@ -380,9 +392,11 @@ for (col in c("citation", "author")) {
 
 setnames(network.dt, c("author", "citation"), c("from", "to"))
 
-# Create copy ------------------------------------------------------------------
+# Create copy and remove duplicated --------------------------------------------
 
 network.dt.claim <- copy(network.dt)
+network.dt.claim <- unique(network.dt.claim, 
+                           by = c("from", "to", "document.type", "nature.claim"))
 
 # Convert all to lower caps ----------------------------------------------------
 
@@ -391,7 +405,7 @@ cols_to_change <- colnames(network.dt)
 network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
 
 
-## ----descriptive_plots, dependson="read_all_datasets", fig.height=1.8, fig.width=6.5------------------
+## ----descriptive_plots, dependson="read_all_datasets", fig.height=1.8, fig.width=6.5-----------------------------------------
 
 # PLOT DESCRIPTIVE STATISTICS ##################################################
 
@@ -433,7 +447,7 @@ b <- network.dt[, .(without.citation = sum(is.na(to)),
 plot_grid(a, b, ncol = 2, rel_widths = c(0.63, 0.37), labels = "auto")
 
 
-## ----network_metrics, dependson="read_all_datasets"---------------------------------------------------
+## ----network_metrics, dependson="read_all_datasets"--------------------------------------------------------------------------
 
 # CALCULATE NETWORK METRICS ####################################################
 
@@ -494,7 +508,7 @@ betweenness.nodes
 pagerank.nodes
 
 
-## ----add_features, dependson=c("read_all_datasets", "network_metrics")--------------------------------
+## ----add_features, dependson=c("read_all_datasets", "network_metrics")-------------------------------------------------------
 
 # ADD FEATURES TO NODES ########################################################
 
@@ -532,7 +546,7 @@ graph <- graph %>%
          pagerank = network_metrics$pagerank)
 
 
-## ----plot_network, dependson="add_features", fig.height=5, fig.width=6.5------------------------------
+## ----plot_network, dependson="add_features", fig.height=5, fig.width=6.5-----------------------------------------------------
 
 # PLOT NETWORK #################################################################
 
@@ -620,7 +634,7 @@ ggraph(graph, layout = "igraph", algorithm = "nicely") +
         legend.position = "right") 
 
 
-## ----preliminary_analysis_abstract_water--------------------------------------------------------------
+## ----preliminary_analysis_abstract_water-------------------------------------------------------------------------------------
 
 # CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
 
@@ -655,7 +669,7 @@ abstract.water.dt[, c(cols_of_interest, "nature.claim"):= lapply(.SD, trimws), .
 abstract.water.dt[, year:= ifelse(is.na(year), as.numeric(gsub("\\D", "", abstract.water.dt$author)), year)]
 
 
-## ----plot_bars, dependson="preliminary_analysis_abstract_water", fig.height=2, fig.width=5.8, warning=FALSE----
+## ----plot_bars, dependson="preliminary_analysis_abstract_water", fig.height=2, fig.width=5.8, warning=FALSE------------------
 
 # PRELIMINARY ANALYSIS #########################################################
 
@@ -686,7 +700,7 @@ c <- tmp$NETWORK %>%
 plot_grid(a, b, c, ncol = 3)
 
 
-## ----network_analysis_water_abstract------------------------------------------------------------------
+## ----network_analysis_water_abstract-----------------------------------------------------------------------------------------
 
 # NETWORK ANALYSIS #############################################################
 
@@ -737,7 +751,7 @@ network_metrics[order(-betweenness)][1:5]
 network_metrics[order(-closeness)][1:5]
 
 
-## ----plot_network_water_abstract, dependson="network_analysis_water_abstract", dev = "pdf", fig.height=8.5, fig.width=7----
+## ----plot_network_water_abstract, dependson="network_analysis_water_abstract", dev = "pdf", fig.height=8.5, fig.width=7------
 
 # PLOT NETWORK #################################################################
 
@@ -783,7 +797,7 @@ ggraph(graph, layout = "igraph", algorithm = "nicely") +
         legend.position = "top") 
 
 
-## ----aquastat_data, fig.height=2, fig.width=2.2-------------------------------------------------------
+## ----aquastat_data, fig.height=2, fig.width=2.2------------------------------------------------------------------------------
 
 # AQUASTAT DATA ################################################################
 
@@ -822,7 +836,7 @@ a
 
 
 
-## ----session_information------------------------------------------------------------------------------
+## ----session_information-----------------------------------------------------------------------------------------------------
 
 # SESSION INFORMATION ##########################################################
 

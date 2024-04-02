@@ -370,7 +370,7 @@ for (i in 1:length(survey.dt.split)) {
 
 ```{r read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")}
 
-# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
+# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ############################
 
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
@@ -413,6 +413,18 @@ network.dt <- tmp[dataset.networks] %>%
 
 network.dt[, author:= ifelse(policy == TRUE, doi, author)]
 
+# CHECK NUMBER OF FAO AQUASTAT CITES ###########################################
+
+network.dt[citation %like% "fao aquastat"] %>%
+  .[, .N, citation]
+
+# WRITE LOOKUP TABLE TO CHECK ALREADY RETRIEVED STUDIES ########################
+
+network.dt[, .(doi, title, author)] %>%
+  .[order(title)] %>%
+  unique(.) %>%
+  write.xlsx(., "lookup.dt.xlsx")
+
 # Remove the year from mentions to FAO Aquastat --------------------------------
 
 pattern <- "\\b(?:19|20)\\d{2}\\b"  # Matches years between 1900 and 2099
@@ -427,9 +439,11 @@ for (col in c("citation", "author")) {
 
 setnames(network.dt, c("author", "citation"), c("from", "to"))
 
-# Create copy ------------------------------------------------------------------
+# Create copy and remove duplicated --------------------------------------------
 
 network.dt.claim <- copy(network.dt)
+network.dt.claim <- unique(network.dt.claim, 
+                           by = c("from", "to", "document.type", "nature.claim"))
 
 # Convert all to lower caps ----------------------------------------------------
 
