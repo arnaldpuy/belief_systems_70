@@ -235,6 +235,29 @@ for (i in c("water", "food")) {
     write.xlsx(paste("full.text.corpus", i, "xlsx", sep = "."))
 }
 
+# LOAD IN FULL TEXT CORPUS (PROXIMITY SEARCH ~15) ##############################
+
+# Load and preprocess water data -----------------------------------------------
+
+dimensions.full.text.water <- load_and_preprocess_data("proximity_search_water2.csv", "water")
+
+results <- dimensions.full.text.water[, .(DOI, PubYear, Title, `Source title`, topic)] %>%
+  setnames(., colnames(.), colnames.full.text) %>%
+  # remove the references that are included in the dataset that 
+  # collects mentions in the abstracts 
+  .[!.$doi %in% final.dt.water.screened$doi] %>%
+  .[, title:= tolower(title)] %>%
+  # filter out studies already surveyed
+  .[!lookup.dt, on = "title"] %>%
+  unique(., by = "title")
+
+fwrite(results, "full.text.corpus.water.csv")
+
+
+full.text.corpus.water <- fread("full.text.corpus.water.csv")
+
+
+
 
 ## ----policy_corpus, dependson="full_text_corpus"-----------------------------------------------------------------------------
 
@@ -299,15 +322,14 @@ split_dt_fun <- function(dt, num_parts) {
 
 # Create the datasets for close reading ----------------------------------------
 
-times.nanxin <- 4
-times.arnald <- 2
+times.nanxin <- 2
+times.arnald <- 1
 nanxin <- paste(rep("nanxin", times.nanxin), 1:times.nanxin, sep = "")
 arnald <- paste(rep("arnald", times.arnald), 1:times.arnald, sep = "")
 names_surveyors <- c(arnald, nanxin, "seth", paste("student", 1:4, sep = ""))
 n.surveyors <- length(names_surveyors)
 
-full.text.corpus.water <- read.xlsx("full.text.corpus.water.xlsx")
-
+# Split the dataset
 survey.dt.split <- split_dt_fun(dt = full.text.corpus.water, num_parts = n.surveyors)
 names(survey.dt.split) <- names_surveyors
 
@@ -373,10 +395,11 @@ network.dt[citation %like% "fao aquastat"] %>%
 
 # WRITE LOOKUP TABLE TO CHECK ALREADY RETRIEVED STUDIES ########################
 
-network.dt[, .(doi, title, author)] %>%
+lookup.dt <- network.dt[, .(doi, title, author)] %>%
   .[order(title)] %>%
-  unique(.) %>%
-  write.xlsx(., "lookup.dt.xlsx")
+  unique(.) 
+
+write.xlsx(lookup.dt, "lookup.dt.xlsx")
 
 # Remove the year from mentions to FAO Aquastat --------------------------------
 
@@ -397,6 +420,9 @@ setnames(network.dt, c("author", "citation"), c("from", "to"))
 network.dt.claim <- copy(network.dt)
 network.dt.claim <- unique(network.dt.claim, 
                            by = c("from", "to", "document.type", "nature.claim"))
+
+unique(network.dt.claim, 
+       by = c("from", "to", "document.type", "nature.claim")) 
 
 # Convert all to lower caps ----------------------------------------------------
 
@@ -850,4 +876,39 @@ cat("Num cores:   "); print(detectCores(logical = FALSE))
 
 ## Return number of threads
 cat("Num threads: "); print(detectCores(logical = FALSE))
+
+
+
+
+############################################
+############################################
+unique(network.dt.claim, by = "claim")
+
+library(stringdist)
+
+# Tokenize claim text into words
+claim_words <- strsplit(unique(network.dt.claim, by = "claim")$claim, "\\s+")
+
+# Find occurrences of target words
+target_words <- c("irrigation", "agriculture", "water", "70", "percent")
+
+out <- list()
+for (i in 1:length(claim_words)) {
+  
+  out[[i]] <- lapply(target_words, function(word) which(claim_words[[i]] == word))
+}
+
+# Calculate distances
+word_distances <- lapply(target_indices, function(indices) {
+  pairwise_dist <- dist(indices)
+  sum(pairwise_dist) / length(pairwise_dist)
+})
+
+# Compute average distances
+average_distances <- sapply(word_distances, mean)
+
+# Print results
+for (i in seq_along(target_words)) {
+  cat("Average distance to", target_words[i], ":", average_distances[i], "\n")
+}
 

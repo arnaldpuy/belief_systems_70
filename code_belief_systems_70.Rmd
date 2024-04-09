@@ -212,16 +212,11 @@ for (i in names(screened.dt)) {
 }
 ```
 
-## Full text corpus
+## Policy corpus
 
-```{r full_text_corpus}
+```{r policy_corpus, dependson="full_text_corpus"}
 
-# LOAD IN DIMENSIONS DATASET (FULL TEXT) #######################################
-
-# Load dataset of the full text ------------------------------------------------
-
-colnames.full.text <- c("doi", "year", "title", "journal", "topic")
-keywords <- c("water", "irrigat")
+# LOAD IN DIMENSIONS DATASETS (POLICY TEXT) ####################################
 
 # Function to load and preprocess data -----------------------------------------
 
@@ -229,59 +224,10 @@ load_and_preprocess_data <- function(file_path, topic) {
   fread(file_path, skip = 1)[, topic := topic]
 }
 
-# Load and preprocess water data -----------------------------------------------
+colnames.full.text <- c("doi", "year", "title", "journal", "topic")
+keywords <- c("water", "irrigat")
 
-dimensions.full.text.water <- load_and_preprocess_data("dimensions_dt_full_text_water_2022_2023.csv", "water")
-
-dimensions.full.text.food <- rbind(
-  load_and_preprocess_data("dimensions_dt_full_text_food_2022.csv", "food"),
-  load_and_preprocess_data("dimensions_dt_full_text_food_2023.csv", "food")
-)
-
-# Combine water and food data --------------------------------------------------
-
-result <- rbind(dimensions.full.text.water, dimensions.full.text.food) %>%
-  .[, .(DOI, PubYear, Title, `Source title`, topic)] %>%
-  setnames(., colnames(.), colnames.full.text) %>%
-  # remove the references that are included in the dataset that 
-  # collects mentions in the abstracts 
-  .[!.$doi %in% final.dt.water.screened$doi] 
-
-# Create a logical condition for pattern matching using grepl ------------------
-
-pattern_condition <- sapply(keywords, function(keyword) 
-  grepl(keyword, result$title, ignore.case = TRUE))
-
-full.text.dt <- result[rowSums(pattern_condition) > 0] 
-
-# Sample just 50% for the analysis ---------------------------------------------
-
-# Create function
-random_sample <- function(input_dt) {
-  set.seed(123)  # Set a seed for reproducibility
-  sampled_dt <- input_dt[sample(.N, .N * 0.5), ]
-  return(sampled_dt)
-}
-
-# sample
-full.text.sampled <- full.text.dt[, random_sample(.SD), topic] 
-
-full.text.sampled[, .N, topic]
-
-# Export -----------------------------------------------------------------------
-
-for (i in c("water", "food")) {
-  
-  full.text.sampled[topic == i] %>%
-    write.xlsx(paste("full.text.corpus", i, "xlsx", sep = "."))
-}
-```
-
-## Policy corpus
-
-```{r policy_corpus, dependson="full_text_corpus"}
-
-# LOAD IN DIMENSIONS DATASETS (POLICY TEXT) ####################################
+# Load data --------------------------------------------------------------------
 
 dt.policy.water <- load_and_preprocess_data("dimensions_dt_policy.csv", "water")
 dt.policy.food <- load_and_preprocess_data("dimensions_dt_policy_food.csv", "food")
@@ -310,7 +256,16 @@ for (i in c("water", "food")) {
 }
 ```
 
-# Split datasets for analysis
+## Full text corpus
+
+```{r full_text_corpus}
+
+# LOAD IN DIMENSIONS DATASET (FULL TEXT) #######################################
+
+full.text.corpus.water <- fread("full.text.corpus.water.csv")
+```
+
+# Split full text corpus for analysis
 
 ```{r split}
 
@@ -344,14 +299,12 @@ split_dt_fun <- function(dt, num_parts) {
 
 # Create the datasets for close reading ----------------------------------------
 
-times.nanxin <- 4
-times.arnald <- 2
+times.nanxin <- 2
+times.arnald <- 1
 nanxin <- paste(rep("nanxin", times.nanxin), 1:times.nanxin, sep = "")
 arnald <- paste(rep("arnald", times.arnald), 1:times.arnald, sep = "")
 names_surveyors <- c(arnald, nanxin, "seth", paste("student", 1:4, sep = ""))
 n.surveyors <- length(names_surveyors)
-
-full.text.corpus.water <- read.xlsx("full.text.corpus.water.xlsx")
 
 survey.dt.split <- split_dt_fun(dt = full.text.corpus.water, num_parts = n.surveyors)
 names(survey.dt.split) <- names_surveyors
@@ -370,7 +323,7 @@ for (i in 1:length(survey.dt.split)) {
 
 ```{r read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")}
 
-# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ############################
+# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
 
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
@@ -420,10 +373,13 @@ network.dt[citation %like% "fao aquastat"] %>%
 
 # WRITE LOOKUP TABLE TO CHECK ALREADY RETRIEVED STUDIES ########################
 
-network.dt[, .(doi, title, author)] %>%
+lookup.dt <- network.dt[, .(doi, title, author)] %>%
   .[order(title)] %>%
-  unique(.) %>%
-  write.xlsx(., "lookup.dt.xlsx")
+  unique(.) 
+
+nrow(lookup.dt)
+
+write.xlsx(lookup.dt, "lookup.dt.xlsx")
 
 # Remove the year from mentions to FAO Aquastat --------------------------------
 
@@ -444,6 +400,8 @@ setnames(network.dt, c("author", "citation"), c("from", "to"))
 network.dt.claim <- copy(network.dt)
 network.dt.claim <- unique(network.dt.claim, 
                            by = c("from", "to", "document.type", "nature.claim"))
+
+fwrite(network.dt.claim, "network.dt.claim.csv")
 
 # Convert all to lower caps ----------------------------------------------------
 
@@ -597,7 +555,7 @@ graph <- graph %>%
          pagerank = network_metrics$pagerank)
 ```
 
-```{r plot_network, dependson="add_features", fig.height=5, fig.width=6.5}
+```{r plot_network, dependson="add_features", fig.height=6, fig.width=7}
 
 # PLOT NETWORK #################################################################
 
@@ -617,7 +575,7 @@ ggraph(graph, layout = "igraph", algorithm = "nicely") +
                  repel = TRUE, size = 2.2) +
   labs(x = "", y = "") +
   scale_color_manual(name = "", 
-                     values = wes_palette(name = "Cavalcanti1", 4)) +
+                     values = wes_palette(name = "Cavalcanti1", 5)) +
   theme_AP() + 
   theme(axis.text.x = element_blank(), 
         axis.ticks.x = element_blank(), 
@@ -637,7 +595,7 @@ ggraph(graph, layout = "igraph", algorithm = "nicely") +
                  repel = TRUE, size = 2.2) +
   labs(x = "", y = "") +
   scale_color_manual(name = "", 
-                     values = wes_palette(name = "Cavalcanti1", 4)) +
+                     values = wes_palette(name = "Cavalcanti1", 5)) +
   theme_AP() + 
   theme(axis.text.x = element_blank(), 
         axis.ticks.x = element_blank(), 
@@ -676,7 +634,7 @@ ggraph(graph, layout = "igraph", algorithm = "nicely") +
                  repel = TRUE, size = 2.2) +
   labs(x = "", y = "") +
   scale_color_manual(name = "", 
-                     values = wes_palette(name = "Cavalcanti1", 4)) +
+                     values = wes_palette(name = "Cavalcanti1", 5)) +
   theme_AP() + 
   theme(axis.text.x = element_blank(), 
         axis.ticks.x = element_blank(), 
