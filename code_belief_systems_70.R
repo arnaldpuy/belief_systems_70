@@ -1,8 +1,8 @@
-## ----setup, include=FALSE----------------------------------------------------------------------------------------------------
+## ----setup, include=FALSE--------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE)
 
 
-## ----preliminary, warning=FALSE, message=FALSE-------------------------------------------------------------------------------
+## ----preliminary, warning=FALSE, message=FALSE-----------------------------
 
 #   PRELIMINARY FUNCTIONS ######################################################
 
@@ -31,7 +31,7 @@ theme_AP <- function() {
 }
 
 
-## ----load_and_read, warning=FALSE--------------------------------------------------------------------------------------------
+## ----load_and_read, warning=FALSE------------------------------------------
 
 # CREATION OF VECTORS WITH NAMES ###############################################
 
@@ -151,7 +151,7 @@ for (i in names(final.dt)) {
 }
 
 
-## ----abstract_corpus---------------------------------------------------------------------------------------------------------
+## ----abstract_corpus-------------------------------------------------------
 
 final.dt.water.screened <- data.table(read.xlsx("final.dt.water_screened.xlsx"))
 final.dt.food.screened <- data.table(read.xlsx("final.dt.food_screened.xlsx"))
@@ -173,14 +173,9 @@ for (i in names(screened.dt)) {
 }
 
 
-## ----full_text_corpus--------------------------------------------------------------------------------------------------------
+## ----policy_corpus, dependson="full_text_corpus"---------------------------
 
-# LOAD IN DIMENSIONS DATASET (FULL TEXT) #######################################
-
-# Load dataset of the full text ------------------------------------------------
-
-colnames.full.text <- c("doi", "year", "title", "journal", "topic")
-keywords <- c("water", "irrigat")
+# LOAD IN DIMENSIONS DATASETS (POLICY TEXT) ####################################
 
 # Function to load and preprocess data -----------------------------------------
 
@@ -188,80 +183,10 @@ load_and_preprocess_data <- function(file_path, topic) {
   fread(file_path, skip = 1)[, topic := topic]
 }
 
-# Load and preprocess water data -----------------------------------------------
+colnames.full.text <- c("doi", "year", "title", "journal", "topic")
+keywords <- c("water", "irrigat")
 
-dimensions.full.text.water <- load_and_preprocess_data("dimensions_dt_full_text_water_2022_2023.csv", "water")
-
-dimensions.full.text.food <- rbind(
-  load_and_preprocess_data("dimensions_dt_full_text_food_2022.csv", "food"),
-  load_and_preprocess_data("dimensions_dt_full_text_food_2023.csv", "food")
-)
-
-# Combine water and food data --------------------------------------------------
-
-result <- rbind(dimensions.full.text.water, dimensions.full.text.food) %>%
-  .[, .(DOI, PubYear, Title, `Source title`, topic)] %>%
-  setnames(., colnames(.), colnames.full.text) %>%
-  # remove the references that are included in the dataset that 
-  # collects mentions in the abstracts 
-  .[!.$doi %in% final.dt.water.screened$doi] 
-
-# Create a logical condition for pattern matching using grepl ------------------
-
-pattern_condition <- sapply(keywords, function(keyword) 
-  grepl(keyword, result$title, ignore.case = TRUE))
-
-full.text.dt <- result[rowSums(pattern_condition) > 0] 
-
-# Sample just 50% for the analysis ---------------------------------------------
-
-# Create function
-random_sample <- function(input_dt) {
-  set.seed(123)  # Set a seed for reproducibility
-  sampled_dt <- input_dt[sample(.N, .N * 0.5), ]
-  return(sampled_dt)
-}
-
-# sample
-full.text.sampled <- full.text.dt[, random_sample(.SD), topic] 
-
-full.text.sampled[, .N, topic]
-
-# Export -----------------------------------------------------------------------
-
-for (i in c("water", "food")) {
-  
-  full.text.sampled[topic == i] %>%
-    write.xlsx(paste("full.text.corpus", i, "xlsx", sep = "."))
-}
-
-# LOAD IN FULL TEXT CORPUS (PROXIMITY SEARCH ~15) ##############################
-
-# Load and preprocess water data -----------------------------------------------
-
-dimensions.full.text.water <- load_and_preprocess_data("proximity_search_water2.csv", "water")
-
-results <- dimensions.full.text.water[, .(DOI, PubYear, Title, `Source title`, topic)] %>%
-  setnames(., colnames(.), colnames.full.text) %>%
-  # remove the references that are included in the dataset that 
-  # collects mentions in the abstracts 
-  .[!.$doi %in% final.dt.water.screened$doi] %>%
-  .[, title:= tolower(title)] %>%
-  # filter out studies already surveyed
-  .[!lookup.dt, on = "title"] %>%
-  unique(., by = "title")
-
-fwrite(results, "full.text.corpus.water.csv")
-
-
-full.text.corpus.water <- fread("full.text.corpus.water.csv")
-
-
-
-
-## ----policy_corpus, dependson="full_text_corpus"-----------------------------------------------------------------------------
-
-# LOAD IN DIMENSIONS DATASETS (POLICY TEXT) ####################################
+# Load data --------------------------------------------------------------------
 
 dt.policy.water <- load_and_preprocess_data("dimensions_dt_policy.csv", "water")
 dt.policy.food <- load_and_preprocess_data("dimensions_dt_policy_food.csv", "food")
@@ -290,7 +215,14 @@ for (i in c("water", "food")) {
 }
 
 
-## ----split-------------------------------------------------------------------------------------------------------------------
+## ----full_text_corpus------------------------------------------------------
+
+# LOAD IN DIMENSIONS DATASET (FULL TEXT) #######################################
+
+full.text.corpus.water <- fread("full.text.corpus.water.csv")
+
+
+## ----split-----------------------------------------------------------------
 
 # SPLIT THE DATASET INTO N FOR RESEARCH ########################################
 
@@ -329,7 +261,6 @@ arnald <- paste(rep("arnald", times.arnald), 1:times.arnald, sep = "")
 names_surveyors <- c(arnald, nanxin, "seth", paste("student", 1:4, sep = ""))
 n.surveyors <- length(names_surveyors)
 
-# Split the dataset
 survey.dt.split <- split_dt_fun(dt = full.text.corpus.water, num_parts = n.surveyors)
 names(survey.dt.split) <- names_surveyors
 
@@ -343,9 +274,9 @@ for (i in 1:length(survey.dt.split)) {
 }
 
 
-## ----read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")-------------------------
+## ----read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")----
 
-# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ############################
+# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
 
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
@@ -399,6 +330,8 @@ lookup.dt <- network.dt[, .(doi, title, author)] %>%
   .[order(title)] %>%
   unique(.) 
 
+nrow(lookup.dt)
+
 write.xlsx(lookup.dt, "lookup.dt.xlsx")
 
 # Remove the year from mentions to FAO Aquastat --------------------------------
@@ -421,17 +354,16 @@ network.dt.claim <- copy(network.dt)
 network.dt.claim <- unique(network.dt.claim, 
                            by = c("from", "to", "document.type", "nature.claim"))
 
-unique(network.dt.claim, 
-       by = c("from", "to", "document.type", "nature.claim")) 
+fwrite(network.dt.claim, "network.dt.claim.csv")
 
 # Convert all to lower caps ----------------------------------------------------
 
 network.dt <- network.dt[, .(from, to, document.type, nature.claim)]
 cols_to_change <- colnames(network.dt)
 network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
+network.dt <- network.dt[!duplicated(network.dt)]
 
-
-## ----descriptive_plots, dependson="read_all_datasets", fig.height=1.8, fig.width=6.5-----------------------------------------
+## ----descriptive_plots, dependson="read_all_datasets", fig.height=1.8, fig.width=6.5----
 
 # PLOT DESCRIPTIVE STATISTICS ##################################################
 
@@ -442,16 +374,26 @@ no.citation.total <- nrow(network.dt.claim[nature.claim == "no citation" &
                                           !document.type == "modelling"])
 no.citation.total / nrow(network.dt.claim) 
 
+# Check proportion of studies cited as making the claim, but actually not making
+# the claim --------------------------------------------------------------------
+
+no.claim.total <- nrow(network.dt.claim[nature.claim == "no claim"])
+no.claim.total / nrow(network.dt.claim) 
+
 # Count document type by nature of claim ---------------------------------------
 
+total.rows <- nrow(network.dt)
+
 a <- network.dt[, .N, .(nature.claim, document.type)] %>%
+  .[, total.rows:= total.rows] %>%
+  .[, proportion:= N / total.rows] %>%
   na.omit() %>%
-  ggplot(., aes(reorder(nature.claim, N), N)) +
+  ggplot(., aes(reorder(nature.claim, proportion), proportion)) +
   coord_flip() +
   geom_bar(stat = "identity") + 
   facet_wrap(~document.type) +
   scale_y_continuous(breaks = breaks_pretty(n = 2)) +
-  labs(x = "", y = "Counts") +
+  labs(x = "", y = "Fraction") +
   theme_AP()
 
 # Count how many documents make the claim and cite / do not cite, 
@@ -460,11 +402,13 @@ a <- network.dt[, .N, .(nature.claim, document.type)] %>%
 b <- network.dt[, .(without.citation = sum(is.na(to)), 
                with.citation = .N - sum(is.na(to))), document.type] %>%
   melt(., measure.vars = c("without.citation", "with.citation")) %>%
-  ggplot(., aes(document.type, value)) +
+  .[, total.rows:= total.rows] %>%
+  .[, proportion:= value / total.rows] %>%
+  ggplot(., aes(document.type, proportion)) +
   geom_bar(stat = "identity") +
   scale_y_continuous(breaks = breaks_pretty(n = 2)) +
   scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
-  labs(x = "", y = "Counts") +
+  labs(x = "", y = "Fraction") +
   facet_wrap(~variable) + 
   theme_AP()
 
@@ -472,8 +416,28 @@ b <- network.dt[, .(without.citation = sum(is.na(to)),
 
 plot_grid(a, b, ncol = 2, rel_widths = c(0.63, 0.37), labels = "auto")
 
+# FUNCTION TO EXTRACT YEARS ####################################################
 
-## ----network_metrics, dependson="read_all_datasets"--------------------------------------------------------------------------
+network.dt.claim[, .N, nature.claim] %>%
+  .[, total:= total.rows] %>%
+  .[, fraction:= N / total] %>%
+  print()
+
+network.dt[is.na(document.type)]
+
+## ----citations_support_claim, dependson="read_all_datasets", fig.height=1.8, fig.width=2.2, warning=FALSE----
+
+# PLOT DISTRIBUTION OF CITATION SUPPORTING THE CLAIM ###########################
+
+network.dt[, .N, from] %>%
+  .[order(-N)] %>%
+  ggplot(., aes(N)) +
+  geom_histogram() + 
+  theme_AP() +
+  labs(x = "Nº citations supporting claim", y = "Counts")
+
+
+## ----network_metrics, dependson="read_all_datasets"------------------------
 
 # CALCULATE NETWORK METRICS ####################################################
 
@@ -534,7 +498,7 @@ betweenness.nodes
 pagerank.nodes
 
 
-## ----add_features, dependson=c("read_all_datasets", "network_metrics")-------------------------------------------------------
+## ----add_features, dependson=c("read_all_datasets", "network_metrics")-----
 
 # ADD FEATURES TO NODES ########################################################
 
@@ -572,7 +536,35 @@ graph <- graph %>%
          pagerank = network_metrics$pagerank)
 
 
-## ----plot_network, dependson="add_features", fig.height=5, fig.width=6.5-----------------------------------------------------
+# PROPORTION OF ALL PATHS THAT PASS THROUGH FIVE HIGHEST BETWEENNESS NODES ######
+
+bc <- betweenness(graph)
+nodes_of_interest <- sort(bc, decreasing = TRUE)[1:5] 
+total_paths <- choose(vcount(graph), 2)  # Total number of paths
+sum(nodes_of_interest) / total_paths
+
+da <- network.dt[nature.claim == "no claim"][, from]
+
+
+# Filter nodes based on "nature.claim" attribute
+filtered_nodes <- V(your_tbl_graph)[your_tbl_graph$nature.claim %in% c("no claim", "no citation")]
+
+# Calculate the proportion of paths ending in filtered nodes
+proportion <- sum(bc[filtered_nodes]) / total_paths
+
+# PROPORTION OF LINKS CONNECTED TO THE 5 NODES WITH HIGHEST DEGREE #############
+
+dg <- degree(graph)
+nodes_of_interest_degree <- sort(dg, decreasing = TRUE)[1:5] 
+total_edges <- ecount(graph)  # Total number of edges
+sum(nodes_of_interest_degree) / total_edges
+
+
+
+
+
+
+## ----plot_network, dependson="add_features", fig.height=6, fig.width=7-----
 
 # PLOT NETWORK #################################################################
 
@@ -592,7 +584,7 @@ ggraph(graph, layout = "igraph", algorithm = "nicely") +
                  repel = TRUE, size = 2.2) +
   labs(x = "", y = "") +
   scale_color_manual(name = "", 
-                     values = wes_palette(name = "Cavalcanti1", 4)) +
+                     values = wes_palette(name = "Cavalcanti1", 5)) +
   theme_AP() + 
   theme(axis.text.x = element_blank(), 
         axis.ticks.x = element_blank(), 
@@ -612,7 +604,7 @@ ggraph(graph, layout = "igraph", algorithm = "nicely") +
                  repel = TRUE, size = 2.2) +
   labs(x = "", y = "") +
   scale_color_manual(name = "", 
-                     values = wes_palette(name = "Cavalcanti1", 4)) +
+                     values = wes_palette(name = "Cavalcanti1", 5)) +
   theme_AP() + 
   theme(axis.text.x = element_blank(), 
         axis.ticks.x = element_blank(), 
@@ -651,7 +643,7 @@ ggraph(graph, layout = "igraph", algorithm = "nicely") +
                  repel = TRUE, size = 2.2) +
   labs(x = "", y = "") +
   scale_color_manual(name = "", 
-                     values = wes_palette(name = "Cavalcanti1", 4)) +
+                     values = wes_palette(name = "Cavalcanti1", 5)) +
   theme_AP() + 
   theme(axis.text.x = element_blank(), 
         axis.ticks.x = element_blank(), 
@@ -660,7 +652,7 @@ ggraph(graph, layout = "igraph", algorithm = "nicely") +
         legend.position = "right") 
 
 
-## ----preliminary_analysis_abstract_water-------------------------------------------------------------------------------------
+## ----preliminary_analysis_abstract_water-----------------------------------
 
 # CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
 
@@ -695,7 +687,7 @@ abstract.water.dt[, c(cols_of_interest, "nature.claim"):= lapply(.SD, trimws), .
 abstract.water.dt[, year:= ifelse(is.na(year), as.numeric(gsub("\\D", "", abstract.water.dt$author)), year)]
 
 
-## ----plot_bars, dependson="preliminary_analysis_abstract_water", fig.height=2, fig.width=5.8, warning=FALSE------------------
+## ----plot_bars, dependson="preliminary_analysis_abstract_water", fig.height=2, fig.width=5.8, warning=FALSE----
 
 # PRELIMINARY ANALYSIS #########################################################
 
@@ -726,7 +718,7 @@ c <- tmp$NETWORK %>%
 plot_grid(a, b, c, ncol = 3)
 
 
-## ----network_analysis_water_abstract-----------------------------------------------------------------------------------------
+## ----network_analysis_water_abstract---------------------------------------
 
 # NETWORK ANALYSIS #############################################################
 
@@ -777,7 +769,7 @@ network_metrics[order(-betweenness)][1:5]
 network_metrics[order(-closeness)][1:5]
 
 
-## ----plot_network_water_abstract, dependson="network_analysis_water_abstract", dev = "pdf", fig.height=8.5, fig.width=7------
+## ----plot_network_water_abstract, dependson="network_analysis_water_abstract", dev = "pdf", fig.height=8.5, fig.width=7----
 
 # PLOT NETWORK #################################################################
 
@@ -823,7 +815,7 @@ ggraph(graph, layout = "igraph", algorithm = "nicely") +
         legend.position = "top") 
 
 
-## ----aquastat_data, fig.height=2, fig.width=2.2------------------------------------------------------------------------------
+## ----aquastat_data, fig.height=2, fig.width=2.2----------------------------
 
 # AQUASTAT DATA ################################################################
 
@@ -862,7 +854,7 @@ a
 
 
 
-## ----session_information-----------------------------------------------------------------------------------------------------
+## ----session_information---------------------------------------------------
 
 # SESSION INFORMATION ##########################################################
 
@@ -876,39 +868,4 @@ cat("Num cores:   "); print(detectCores(logical = FALSE))
 
 ## Return number of threads
 cat("Num threads: "); print(detectCores(logical = FALSE))
-
-
-
-
-############################################
-############################################
-unique(network.dt.claim, by = "claim")
-
-library(stringdist)
-
-# Tokenize claim text into words
-claim_words <- strsplit(unique(network.dt.claim, by = "claim")$claim, "\\s+")
-
-# Find occurrences of target words
-target_words <- c("irrigation", "agriculture", "water", "70", "percent")
-
-out <- list()
-for (i in 1:length(claim_words)) {
-  
-  out[[i]] <- lapply(target_words, function(word) which(claim_words[[i]] == word))
-}
-
-# Calculate distances
-word_distances <- lapply(target_indices, function(indices) {
-  pairwise_dist <- dist(indices)
-  sum(pairwise_dist) / length(pairwise_dist)
-})
-
-# Compute average distances
-average_distances <- sapply(word_distances, mean)
-
-# Print results
-for (i in seq_along(target_words)) {
-  cat("Average distance to", target_words[i], ":", average_distances[i], "\n")
-}
 

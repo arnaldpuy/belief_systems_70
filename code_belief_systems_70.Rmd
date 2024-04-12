@@ -323,7 +323,7 @@ for (i in 1:length(survey.dt.split)) {
 
 ```{r read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")}
 
-# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
+# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ##############################
 
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
@@ -414,23 +414,27 @@ network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
 
 # PLOT DESCRIPTIVE STATISTICS ##################################################
 
-# Check proportio of studies making the claim but without providing any citation and 
-# not being primary papers (!modelling) ----------------------------------------
+total.rows <- nrow(network.dt)
 
-no.citation.total <- nrow(network.dt.claim[nature.claim == "no citation" & 
-                                          !document.type == "modelling"])
-no.citation.total / nrow(network.dt.claim) 
+# Check proportion of studies by nature of claim -------------------------------
+
+network.dt.claim[, .N, nature.claim] %>%
+  .[, total:= total.rows] %>%
+  .[, fraction:= N / total] %>%
+  print()
 
 # Count document type by nature of claim ---------------------------------------
 
 a <- network.dt[, .N, .(nature.claim, document.type)] %>%
+  .[, total.rows:= total.rows] %>%
+  .[, proportion:= N / total.rows] %>%
   na.omit() %>%
-  ggplot(., aes(reorder(nature.claim, N), N)) +
+  ggplot(., aes(reorder(nature.claim, proportion), proportion)) +
   coord_flip() +
   geom_bar(stat = "identity") + 
   facet_wrap(~document.type) +
   scale_y_continuous(breaks = breaks_pretty(n = 2)) +
-  labs(x = "", y = "Counts") +
+  labs(x = "", y = "Fraction") +
   theme_AP()
 
 # Count how many documents make the claim and cite / do not cite, 
@@ -439,17 +443,31 @@ a <- network.dt[, .N, .(nature.claim, document.type)] %>%
 b <- network.dt[, .(without.citation = sum(is.na(to)), 
                with.citation = .N - sum(is.na(to))), document.type] %>%
   melt(., measure.vars = c("without.citation", "with.citation")) %>%
-  ggplot(., aes(document.type, value)) +
+  .[, total.rows:= total.rows] %>%
+  .[, proportion:= value / total.rows] %>%
+  ggplot(., aes(document.type, proportion)) +
   geom_bar(stat = "identity") +
   scale_y_continuous(breaks = breaks_pretty(n = 2)) +
   scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
-  labs(x = "", y = "Counts") +
+  labs(x = "", y = "Fraction") +
   facet_wrap(~variable) + 
   theme_AP()
 
 # merge ------------------------------------------------------------------------
 
 plot_grid(a, b, ncol = 2, rel_widths = c(0.63, 0.37), labels = "auto")
+```
+
+```{r citations_support_claim, dependson="read_all_datasets", fig.height=1.8, fig.width=2.2, warning=FALSE}
+
+# PLOT DISTRIBUTION OF CITATION SUPPORTING THE CLAIM ###########################
+
+network.dt[, .N, from] %>%
+  .[order(-N)] %>%
+  ggplot(., aes(N)) +
+  geom_histogram() + 
+  theme_AP() +
+  labs(x = "Nº citations supporting claim \n per paper", y = "Counts")
 ```
 
 ## Network metrics
@@ -554,6 +572,34 @@ graph <- graph %>%
          betweenness = network_metrics$betweenness, 
          pagerank = network_metrics$pagerank)
 ```
+
+```{r calculate_proportion, dependson="add_features"}
+
+# NUMBER OF NODES ##############################################################
+
+V(graph)
+
+# NUMBER OF EDGES ##############################################################
+
+ecount(graph)
+
+# PROPORTION OF ALL PATHS THAT PASS THROUGH FIVE HIGHEST BETWEENNESS NODES ######
+
+bc <- betweenness(graph)
+nodes_of_interest <- sort(bc, decreasing = TRUE)[1:5] 
+total_paths <- choose(vcount(graph), 2)  # Total number of paths
+total_paths
+sum(nodes_of_interest) / total_paths
+
+# PROPORTION OF LINKS CONNECTED TO THE 5 NODES WITH HIGHEST DEGREE #############
+
+dg <- degree(graph)
+nodes_of_interest_degree <- sort(dg, decreasing = TRUE)[1:5] 
+total_edges <- ecount(graph)  # Total number of edges
+sum(nodes_of_interest_degree) / total_edges
+
+```
+
 
 ```{r plot_network, dependson="add_features", fig.height=6, fig.width=7}
 
