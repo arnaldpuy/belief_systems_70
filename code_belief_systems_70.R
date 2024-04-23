@@ -1,8 +1,8 @@
-## ----setup, include=FALSE-------------------------------------------------------------------
+## ----setup, include=FALSE-------------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE)
 
 
-## ----preliminary, warning=FALSE, message=FALSE----------------------------------------------
+## ----preliminary, warning=FALSE, message=FALSE----------------------------------
 
 #   PRELIMINARY FUNCTIONS ######################################################
 
@@ -31,7 +31,7 @@ theme_AP <- function() {
 }
 
 
-## ----load_and_read, warning=FALSE-----------------------------------------------------------
+## ----load_and_read, warning=FALSE-----------------------------------------------
 
 # CREATION OF VECTORS WITH NAMES ###############################################
 
@@ -151,7 +151,7 @@ for (i in names(final.dt)) {
 }
 
 
-## ----abstract_corpus------------------------------------------------------------------------
+## ----abstract_corpus------------------------------------------------------------
 
 final.dt.water.screened <- data.table(read.xlsx("final.dt.water_screened.xlsx"))
 final.dt.food.screened <- data.table(read.xlsx("final.dt.food_screened.xlsx"))
@@ -173,7 +173,7 @@ for (i in names(screened.dt)) {
 }
 
 
-## ----policy_corpus, dependson="full_text_corpus"--------------------------------------------
+## ----policy_corpus, dependson="full_text_corpus"--------------------------------
 
 # LOAD IN DIMENSIONS DATASETS (POLICY TEXT) ####################################
 
@@ -215,14 +215,14 @@ for (i in c("water", "food")) {
 }
 
 
-## ----full_text_corpus-----------------------------------------------------------------------
+## ----full_text_corpus-----------------------------------------------------------
 
 # LOAD IN DIMENSIONS DATASET (FULL TEXT) #######################################
 
 full.text.corpus.water <- fread("full.text.corpus.water.csv")
 
 
-## ----split----------------------------------------------------------------------------------
+## ----split----------------------------------------------------------------------
 
 # SPLIT THE DATASET INTO N FOR RESEARCH ########################################
 
@@ -280,7 +280,7 @@ for (i in 1:length(survey.dt.split)) {
 
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
-topics <- c("water")
+topics <- c("water", "food")
 corpus <- c("abstract.corpus", "policy.corpus", "full.text.corpus") 
 cols_of_interest <- c("title", "author", "claim", "citation")
 
@@ -301,7 +301,8 @@ for (i in 1:length(all.files)) {
   if (!str_detect(all.files[i], "NETWORK")) { 
     
     tmp[[i]][, title:= tolower(title)]
-  } else {
+    
+     } else {
     
     tmp[[i]][, (cols_of_interest):= lapply(.SD, tolower), .SDcols = (cols_of_interest)]
   }
@@ -309,12 +310,18 @@ for (i in 1:length(all.files)) {
 
 names(tmp) <- all.files
 
+sub(".*\\.([^\\.]+)_.*", "\\1", all.files)
+
 
 # CLEAN AND MERGE DATASETS #####################################################
 
 dataset.networks <- all.files[str_detect(all.files, "NETWORK")]
-network.dt <- tmp[dataset.networks] %>%
-  rbindlist() %>%
+dataset.networks.topics <- sub(".*\\.([^\\.]+)_.*", "\\1", dataset.networks)
+
+tmp2 <- tmp[dataset.networks]
+names(tmp2) <- dataset.networks.topics
+
+network.dt <- rbindlist(tmp2, idcol = "topic") %>%
   .[, policy:= grepl("^policy", doi)]
 
 network.dt[, author:= ifelse(policy == TRUE, doi, author)]
@@ -322,15 +329,15 @@ network.dt[, author:= ifelse(policy == TRUE, doi, author)]
 # CHECK NUMBER OF FAO AQUASTAT CITES ###########################################
 
 network.dt[citation %like% "fao aquastat"] %>%
-  .[, .N, citation]
+  .[, .N, .(citation, topic)]
 
 # WRITE LOOKUP TABLE TO CHECK ALREADY RETRIEVED STUDIES ########################
 
-lookup.dt <- network.dt[, .(doi, title, author)] %>%
+lookup.dt <- network.dt[, .(doi, title, author, topic)] %>%
   .[order(title)] %>%
   unique(.) 
 
-nrow(lookup.dt)
+lookup.dt[, .(number.rows = nrow(.SD)), topic]
 
 write.xlsx(lookup.dt, "lookup.dt.xlsx")
 
@@ -358,34 +365,34 @@ fwrite(network.dt.claim, "network.dt.claim.csv")
 
 # Convert all to lower caps ----------------------------------------------------
 
-network.dt <- network.dt[, .(from, to, document.type, nature.claim)]
+network.dt <- network.dt[, .(from, to, document.type, nature.claim, topic)]
 cols_to_change <- colnames(network.dt)
 network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
 
 
-## ----descriptive_plots, dependson="read_all_datasets", fig.height=1.8, fig.width=6.5--------
+## ----descriptive_plots, dependson="read_all_datasets", fig.height=1.8, fig.width=6.5----
 
 # PLOT DESCRIPTIVE STATISTICS ##################################################
 
-total.rows <- nrow(network.dt)
+total.rows <- network.dt[, .(number.rows = nrow(.SD)), topic]
 
 # Check proportion of studies by nature of claim -------------------------------
 
-network.dt.claim[, .N, nature.claim] %>%
-  .[, total:= total.rows] %>%
-  .[, fraction:= N / total] %>%
+network.dt.claim[, .N, .(nature.claim, topic)] %>%
+  merge(., total.rows, by = "topic") %>%
+  .[, fraction:= N / number.rows] %>%
   print()
 
 # Count document type by nature of claim ---------------------------------------
 
-a <- network.dt[, .N, .(nature.claim, document.type)] %>%
-  .[, total.rows:= total.rows] %>%
-  .[, proportion:= N / total.rows] %>%
+a <- network.dt[, .N, .(nature.claim, document.type, topic)] %>%
+  merge(., total.rows, by = "topic") %>%
+  .[, proportion:= N / number.rows] %>%
   na.omit() %>%
   ggplot(., aes(reorder(nature.claim, proportion), proportion)) +
   coord_flip() +
   geom_bar(stat = "identity") + 
-  facet_wrap(~document.type) +
+  facet_grid(topic~document.type) +
   scale_y_continuous(breaks = breaks_pretty(n = 2)) +
   labs(x = "", y = "Fraction") +
   theme_AP()
@@ -394,16 +401,16 @@ a <- network.dt[, .N, .(nature.claim, document.type)] %>%
 # by document.type -------------------------------------------------------------
 
 b <- network.dt[, .(without.citation = sum(is.na(to)), 
-               with.citation = .N - sum(is.na(to))), document.type] %>%
+                    with.citation = .N - sum(is.na(to))), .(document.type, topic)] %>%
   melt(., measure.vars = c("without.citation", "with.citation")) %>%
-  .[, total.rows:= total.rows] %>%
-  .[, proportion:= value / total.rows] %>%
+  merge(., total.rows, by = "topic") %>%
+  .[, proportion:= value / number.rows] %>%
   ggplot(., aes(document.type, proportion)) +
   geom_bar(stat = "identity") +
   scale_y_continuous(breaks = breaks_pretty(n = 2)) +
   scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
   labs(x = "", y = "Fraction") +
-  facet_wrap(~variable) + 
+  facet_grid(topic~variable) + 
   theme_AP()
 
 # merge ------------------------------------------------------------------------
@@ -415,72 +422,76 @@ plot_grid(a, b, ncol = 2, rel_widths = c(0.63, 0.37), labels = "auto")
 
 # PLOT DISTRIBUTION OF CITATION SUPPORTING THE CLAIM ###########################
 
-network.dt[, .N, from] %>%
+network.dt[, .N, .(from, topic)] %>%
   .[order(-N)] %>%
   ggplot(., aes(N)) +
   geom_histogram() + 
+  facet_grid(~topic, space = "free") +
   theme_AP() +
   labs(x = "Nº citations supporting claim \n per paper", y = "Counts")
 
 
-## ----network_metrics, dependson="read_all_datasets"-----------------------------------------
+## ----network_metrics, dependson="read_all_datasets"-----------------------------
 
 # CALCULATE NETWORK METRICS ####################################################
 
 # only complete cases ----------------------------------------------------------
 
 network.dt.complete <- network.dt[complete.cases(network.dt$to), ]
+split.networks <- split(network.dt.complete, network.dt.complete$topic)
 
 # Transform to graph -----------------------------------------------------------
 
-citation_graph <- graph_from_data_frame(d = network.dt.complete, directed = TRUE)
-
+citation_graph <- lapply(split.networks, function(dt) 
+  graph_from_data_frame(d = dt, directed = TRUE))
+  
 # Calculate network metrics ----------------------------------------------------
 
-edge_density(citation_graph)
+lapply(citation_graph, function(x) edge_density(x))
 
 # Modularity: 
 # - c.1: Strong community structure, where nodes within groups are highly connected.
 # - c. -1: Opposite of community structure, where nodes between groups are more connected.
 # - c. 0: Indicates absence of community structure or anti-community structure in the network.
-wtc <- cluster_walktrap(citation_graph)
-modularity(wtc)
+wtc <- lapply(citation_graph, function(x) cluster_walktrap(x))
+lapply(wtc, function(x) modularity(x))
 
-network_metrics <- data.table(node = V(citation_graph)$name,
-                              
-                              # Degree of a node: The number of connections or 
-                              # edges linked to that node. 
-                              # It represents how well-connected or central a 
-                              # node is within the graph.
-                              degree = degree(citation_graph, mode = "in"),
-                              
-                              degree.out = degree(citation_graph, mode = "out"),
-                              
-                              # Betweenness centrality of a node: Measures the 
-                              # extent to which a node lies on the shortest 
-                              # paths between all pairs of other nodes in the graph. 
-                              # Nodes with high betweenness centrality act as 
-                              # bridges or intermediaries, facilitating 
-                              # communication and information flow between other nodes.
-                              betweenness = betweenness(citation_graph),
-                              
-                              # Closeness centrality of a node: Measures how 
-                              # close a node is to all other nodes in the graph, 
-                              # taking into account the length of the shortest paths. 
-                              # Nodes with high closeness centrality are able to 
-                              # efficiently communicate or interact with other 
-                              # nodes in the graph.
-                              closeness = closeness(citation_graph),
-                              pagerank = page_rank(citation_graph)$vector
+network_metrics <- lapply(citation_graph, function(x) 
+  data.table(node = V(x)$name,
+             
+             # Degree of a node: The number of connections or 
+             # edges linked to that node. 
+             # It represents how well-connected or central a 
+             # node is within the graph.
+             degree = degree(x, mode = "in"),
+             
+             degree.out = degree(x, mode = "out"),
+             
+             # Betweenness centrality of a node: Measures the 
+             # extent to which a node lies on the shortest 
+             # paths between all pairs of other nodes in the graph. 
+             # Nodes with high betweenness centrality act as 
+             # bridges or intermediaries, facilitating 
+             # communication and information flow between other nodes.
+             betweenness = betweenness(x),
+             
+             # Closeness centrality of a node: Measures how 
+             # close a node is to all other nodes in the graph, 
+             # taking into account the length of the shortest paths. 
+             # Nodes with high closeness centrality are able to 
+             # efficiently communicate or interact with other 
+             # nodes in the graph.
+             closeness = closeness(x),
+             pagerank = page_rank(x)$vector)
 )
 
 # Define the max number of rows
 max.number <- 3
 
-degree.nodes <- network_metrics[order(-degree)][1:max.number]
-degree.nodes.out <- network_metrics[order(-degree.out)][1:max.number]
-betweenness.nodes <- network_metrics[order(-betweenness)][1:max.number]
-pagerank.nodes <- network_metrics[order(-closeness)][1:max.number]
+degree.nodes <- lapply(network_metrics, function(dt) dt[order(-degree)][1:max.number])
+degree.nodes.out <- lapply(network_metrics, function(dt) dt[order(-degree.out)][1:max.number])
+betweenness.nodes <- lapply(network_metrics, function(dt) dt[order(-betweenness)][1:max.number])
+pagerank.nodes <- lapply(network_metrics, function(dt) dt[order(-closeness)][1:max.number])
 
 degree.nodes
 degree.nodes.out
@@ -488,73 +499,105 @@ betweenness.nodes
 pagerank.nodes
 
 
-## ----add_features, dependson=c("read_all_datasets", "network_metrics")----------------------
+## ----add_features, dependson=c("read_all_datasets", "network_metrics")----------
 
 # ADD FEATURES TO NODES ########################################################
 
 # Retrieve a vector with the node names ----------------------------------------
 
-graph <- tidygraph::as_tbl_graph(network.dt.complete, directed = TRUE) 
-vec.names <- graph %>%
-  activate(nodes) %>%
-  pull() %>%
-  data.table(name = .)
+graph <- lapply(split.networks, function(nt)
+  tidygraph::as_tbl_graph(nt, directed = TRUE))
+
+vec.names <- lapply(graph, function(graph)
+  graph %>%
+    activate(nodes) %>%
+    pull() %>%
+    data.table(name = .))
+
 
 # Merge with info from the network.dt ------------------------------------------
 
-vec.nature.claim <- merge(merge(vec.names, unique(network.dt[, .(from, nature.claim)]), 
-                                by.x = "name", by.y = "from", all.x = TRUE), 
-                          unique(network.dt[, .(from, document.type)]), 
-                          by.x = "name", by.y = "from", all.x = TRUE)
+tmp.network <- split(network.dt, network.dt$topic)
+
+vec.nature.claim <- list()
+
+for(i in names(tmp.network)) {
+  
+  vec.nature.claim[[i]] <- merge(merge(vec.names[[i]], unique(tmp.network[[i]][, .(from, nature.claim)]), 
+                                       by.x = "name", by.y = "from", all.x = TRUE), 
+                                 unique(tmp.network[[i]][, .(from, document.type)]), 
+                                 by.x = "name", by.y = "from", all.x = TRUE)
+}
 
 # Merge with the correct order -------------------------------------------------
 
-order_indices <- match(vec.names$name, vec.nature.claim$name)
-final.vec.nature.claim <- vec.nature.claim[order_indices, ] %>%
-  .[, nature.claim] 
-final.vec.document.type <- vec.nature.claim[order_indices, ] %>%
-  .[, document.type] 
+order_indices <- final.vec.nature.claim <- final.vec.document.type <- list()
+
+for (i in names(vec.names)) {
+  
+  order_indices[[i]] <- match(vec.names[[i]]$name, vec.nature.claim[[i]]$name)
+  final.vec.nature.claim[[i]] <- vec.nature.claim[[i]][order_indices[[i]], ] %>%
+    .[, nature.claim] 
+  final.vec.document.type[[i]] <- vec.nature.claim[[i]][order_indices[[i]], ] %>%
+    .[, document.type] 
+}
 
 # Attach to the graph ----------------------------------------------------------
 
-graph <- graph %>%
-  activate(nodes) %>%
-  mutate(nature.claim = final.vec.nature.claim, 
-         document.type = final.vec.document.type, 
-         degree = network_metrics$degree, 
-         degree.out = network_metrics$degree.out,
-         betweenness = network_metrics$betweenness, 
-         pagerank = network_metrics$pagerank)
+graph.final <- list()
+
+for (i in names(graph)) {
+  
+  graph.final[[i]] <- graph[[i]] %>%
+    activate(nodes) %>%
+    mutate(nature.claim = final.vec.nature.claim[[i]], 
+           document.type = final.vec.document.type[[i]], 
+           degree = network_metrics[[i]]$degree, 
+           degree.out = network_metrics[[i]]$degree.out,
+           betweenness = network_metrics[[i]]$betweenness, 
+           pagerank = network_metrics[[i]]$pagerank)
+  
+  
+}
 
 
-## ----calculate_proportion, dependson="add_features"-----------------------------------------
+## ----calculate_proportion, dependson="add_features"-----------------------------
 
 # NUMBER OF NODES ##############################################################
 
-V(graph)
+lapply(graph.final, function(graph) V(graph))
 
 # NUMBER OF EDGES ##############################################################
 
-ecount(graph)
+lapply(graph.final, function(graph) ecount(graph))
 
 # PROPORTION OF ALL PATHS THAT PASS THROUGH FIVE HIGHEST BETWEENNESS NODES ######
 
-bc <- betweenness(graph)
-nodes_of_interest <- sort(bc, decreasing = TRUE)[1:5] 
-total_paths <- choose(vcount(graph), 2)  # Total number of paths
-total_paths
-sum(nodes_of_interest) / total_paths
+lapply(graph.final, function(graph) {
+  
+  bc <- betweenness(graph)
+  nodes_of_interest <- sort(bc, decreasing = TRUE)[1:5] 
+  total_paths <- choose(vcount(graph), 2)  # Total number of paths
+  total_paths
+  sum(nodes_of_interest) / total_paths
+  
+  })
+
 
 # PROPORTION OF LINKS CONNECTED TO THE 5 NODES WITH HIGHEST DEGREE #############
 
-dg <- degree(graph)
-nodes_of_interest_degree <- sort(dg, decreasing = TRUE)[1:5] 
-total_edges <- ecount(graph)  # Total number of edges
-sum(nodes_of_interest_degree) / total_edges
+lapply(graph.final, function(graph) {
+  
+  dg <- degree(graph)
+  nodes_of_interest_degree <- sort(dg, decreasing = TRUE)[1:5] 
+  total_edges <- ecount(graph)  # Total number of edges
+  sum(nodes_of_interest_degree) / total_edges
+  
+})
 
 
 
-## ----plot_network, dependson="add_features", fig.height=6, fig.width=7----------------------
+## ----plot_network, dependson="add_features", fig.height=6, fig.width=7----------
 
 # PLOT NETWORK #################################################################
 
@@ -562,87 +605,111 @@ seed <- 123
 
 # by nature of claim -----------------------------------------------------------
 
-set.seed(seed)
-
 # Label the nodes with highest degree ------------------------------------------
 
-ggraph(graph, layout = "igraph", algorithm = "nicely") + 
-  geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
-                 end_cap = circle(1, "mm")) + 
-  geom_node_point(aes(color = nature.claim, size = degree)) +
-  geom_node_text(aes(label = ifelse(degree >= min(degree.nodes$degree), name, NA)), 
-                 repel = TRUE, size = 2.2) +
-  labs(x = "", y = "") +
-  scale_color_manual(name = "", 
-                     values = wes_palette(name = "Cavalcanti1", 5)) +
-  theme_AP() + 
-  theme(axis.text.x = element_blank(), 
-        axis.ticks.x = element_blank(), 
-        axis.text.y = element_blank(), 
-        axis.ticks.y = element_blank(), 
-        legend.position = "right") 
+p1 <- p2 <- p3 <- p4 <- list()
 
-set.seed(seed)
+for(i in names(graph.final)) {
+  
+  set.seed(seed)
+  
+  p1[[i]] <- ggraph(graph.final[[i]], layout = "igraph", algorithm = "nicely") + 
+    geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
+                   end_cap = circle(1, "mm")) + 
+    geom_node_point(aes(color = nature.claim, size = degree)) +
+    geom_node_text(aes(label = ifelse(degree >= min(degree.nodes[[i]]$degree), name, NA)), 
+                   repel = TRUE, size = 2.2) +
+    labs(x = "", y = "") +
+    scale_color_manual(name = "", 
+                       values = wes_palette(name = "Cavalcanti1", 5)) +
+    theme_AP() + 
+    theme(axis.text.x = element_blank(), 
+          axis.ticks.x = element_blank(), 
+          axis.text.y = element_blank(), 
+          axis.ticks.y = element_blank(), 
+          legend.position = "right") 
+}
+  
+p1
 
 # Label the nodes with highest betweenness -------------------------------------
 
-ggraph(graph, layout = "igraph", algorithm = "nicely") + 
-  geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
-                 end_cap = circle(1, "mm")) + 
-  geom_node_point(aes(color = nature.claim, size = betweenness)) +
-  geom_node_text(aes(label = ifelse(betweenness >= min(betweenness.nodes$betweenness), name, NA)), 
-                 repel = TRUE, size = 2.2) +
-  labs(x = "", y = "") +
-  scale_color_manual(name = "", 
-                     values = wes_palette(name = "Cavalcanti1", 5)) +
-  theme_AP() + 
-  theme(axis.text.x = element_blank(), 
-        axis.ticks.x = element_blank(), 
-        axis.text.y = element_blank(), 
-        axis.ticks.y = element_blank(), 
-        legend.position = "right") 
+for (i in names(graph.final)) {
+  
+  set.seed(seed)
+  
+  p2[[i]] <- ggraph(graph.final[[i]], layout = "igraph", algorithm = "nicely") + 
+    geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
+                   end_cap = circle(1, "mm")) + 
+    geom_node_point(aes(color = nature.claim, size = betweenness)) +
+    geom_node_text(aes(label = ifelse(betweenness >= min(betweenness.nodes[[i]]$betweenness), 
+                                      name, NA)), 
+                   repel = TRUE, size = 2.2) +
+    labs(x = "", y = "") +
+    scale_color_manual(name = "", 
+                       values = wes_palette(name = "Cavalcanti1", 5)) +
+    theme_AP() + 
+    theme(axis.text.x = element_blank(), 
+          axis.ticks.x = element_blank(), 
+          axis.text.y = element_blank(), 
+          axis.ticks.y = element_blank(), 
+          legend.position = "right") 
+}
+
+p2
+
 
 # by document.type--------------------------------------------------------------
 
-set.seed(seed)
+for (i in names(graph.final)) {
+  
+  set.seed(seed)
+  
+  p3[[i]] <- ggraph(graph.final[[i]], layout = "igraph", algorithm = "nicely") + 
+    geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
+                   end_cap = circle(1, "mm")) + 
+    geom_node_point(aes(color = document.type, size = degree)) +
+    geom_node_text(aes(label = ifelse(degree >= min(degree.nodes[[i]]$degree), name, NA)), 
+                   repel = TRUE, size = 2.2) +
+    labs(x = "", y = "") +
+    scale_color_discrete(name = "") +
+    theme_AP() + 
+    theme(axis.text.x = element_blank(), 
+          axis.ticks.x = element_blank(), 
+          axis.text.y = element_blank(), 
+          axis.ticks.y = element_blank(), 
+          legend.position = "right") 
+}
 
-ggraph(graph, layout = "igraph", algorithm = "nicely") + 
-  geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
-                 end_cap = circle(1, "mm")) + 
-  geom_node_point(aes(color = document.type, size = degree)) +
-  geom_node_text(aes(label = ifelse(degree >= min(degree.nodes$degree), name, NA)), 
-                 repel = TRUE, size = 2.2) +
-  labs(x = "", y = "") +
-  scale_color_discrete(name = "") +
-  theme_AP() + 
-  theme(axis.text.x = element_blank(), 
-        axis.ticks.x = element_blank(), 
-        axis.text.y = element_blank(), 
-        axis.ticks.y = element_blank(), 
-        legend.position = "right") 
+p3
 
 # Label nodes that are modelling exercises -------------------------------------
 
-set.seed(seed)
+for (i in names(graph.final)) {
+  
+  set.seed(seed)
+  
+  p4[[i]] <- ggraph(graph.final[[i]], layout = "igraph", algorithm = "nicely") + 
+    geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
+                   end_cap = circle(1, "mm")) + 
+    geom_node_point(aes(color = nature.claim)) +
+    geom_node_text(aes(label = ifelse(nature.claim == "modelling", name, NA)), 
+                   repel = TRUE, size = 2.2) +
+    labs(x = "", y = "") +
+    scale_color_manual(name = "", 
+                       values = wes_palette(name = "Cavalcanti1", 5)) +
+    theme_AP() + 
+    theme(axis.text.x = element_blank(), 
+          axis.ticks.x = element_blank(), 
+          axis.text.y = element_blank(), 
+          axis.ticks.y = element_blank(), 
+          legend.position = "right") 
+}
 
-ggraph(graph, layout = "igraph", algorithm = "nicely") + 
-  geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
-                 end_cap = circle(1, "mm")) + 
-  geom_node_point(aes(color = nature.claim)) +
-  geom_node_text(aes(label = ifelse(nature.claim == "modelling", name, NA)), 
-                 repel = TRUE, size = 2.2) +
-  labs(x = "", y = "") +
-  scale_color_manual(name = "", 
-                     values = wes_palette(name = "Cavalcanti1", 5)) +
-  theme_AP() + 
-  theme(axis.text.x = element_blank(), 
-        axis.ticks.x = element_blank(), 
-        axis.text.y = element_blank(), 
-        axis.ticks.y = element_blank(), 
-        legend.position = "right") 
+p4
 
 
-## ----analysis_network_paths, dependson="add_features"---------------------------------------
+## ----analysis_network_paths, dependson="add_features"---------------------------
 
 # COUNT THE NUMBER OF NODES WITH PATHS ULTIMATELY LEADING TO NODES
 # THAT DO NOT MAKE THE CITATION ################################################
@@ -672,45 +739,64 @@ nodes_to_no_claim_node_fun <- function(g, terminal_nodes) {
 }
 
 
-## ----analysis_paths_nodes, dependson="analysis_network_paths"-------------------------------
+## ----analysis_paths_nodes, dependson="analysis_network_paths"-------------------
 
 # CALCULATE
 
 # Extract name of all nodes ----------------------------------------------------
-
-all_nodes <- graph %>%
-  activate(nodes) %>%
-  pull(name)
+all_nodes <- lapply(graph.final, function(graph)
+  graph %>%
+    activate(nodes) %>%
+    pull(name))
 
 # Extract name of nodes that do not make the claim -----------------------------
 
-no.claim_nodes <- graph %>%
-  activate(nodes) %>%
-  filter(degree.out == 0 & nature.claim == "no claim") %>%
-  pull(., "name")
+no.claim_nodes <- lapply(graph.final, function(graph)
+  graph %>%
+    activate(nodes) %>%
+    filter(degree.out == 0 & nature.claim == "no claim") %>%
+    pull(., "name"))
 
 # Extract name of nodes that do not make the claim and those that make 
 # the claim but do not cite anybody --------------------------------------------
 
-no.claim.and.no.citation.nodes <- graph %>%
+no.claim.and.no.citation.nodes <- lapply(graph.final, function(graph) 
+  graph %>%
   activate(nodes) %>%
   filter(degree.out == 0 & nature.claim == "no claim" | nature.claim == "no citation" ) %>%
-  pull(., "name")
+  pull(., "name"))
 
 # Run the function -------------------------------------------------------------
 
-out <- lapply(list(no.claim_nodes, no.claim.and.no.citation.nodes), function(x)
-  sort(nodes_to_no_claim_node_fun(graph, terminal_nodes = x)))
+tmp <- list()
 
-names(out) <- c("path ending in no claim", "path ending in no claim or no citation")
-out
+for(i in names(graph.final)) {
+  
+  tmp[[i]] <- lapply(list(no.claim_nodes[[i]], 
+                          no.claim.and.no.citation.nodes[[i]]), function(x)
+    sort(nodes_to_no_claim_node_fun(graph.final[[i]], terminal_nodes = x)))
+}
+
+for(i in names(graph.final)) {
+  names(tmp[[i]]) <- c("path ending in no claim", 
+                               "path ending in no claim or no citation")
+}
+
+tmp
+
 
 # Calculate proportions --------------------------------------------------------
 
-lapply(out, function(x) length(x) / length(all_nodes))
+out <- list()
+
+for(i in names(tmp)) {
+  out[[i]] <- lapply(tmp[[i]], function(x) length(x) / length(all_nodes[[i]]))
+}
+
+out
 
 
-## ----session_information--------------------------------------------------------------------
+## ----session_information--------------------------------------------------------
 
 # SESSION INFORMATION ##########################################################
 
