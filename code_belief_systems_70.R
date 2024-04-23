@@ -1,8 +1,8 @@
-## ----setup, include=FALSE--------------------------------------------------
+## ----setup, include=FALSE-------------------------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE)
 
 
-## ----preliminary, warning=FALSE, message=FALSE-----------------------------
+## ----preliminary, warning=FALSE, message=FALSE----------------------------------------------
 
 #   PRELIMINARY FUNCTIONS ######################################################
 
@@ -31,7 +31,7 @@ theme_AP <- function() {
 }
 
 
-## ----load_and_read, warning=FALSE------------------------------------------
+## ----load_and_read, warning=FALSE-----------------------------------------------------------
 
 # CREATION OF VECTORS WITH NAMES ###############################################
 
@@ -151,7 +151,7 @@ for (i in names(final.dt)) {
 }
 
 
-## ----abstract_corpus-------------------------------------------------------
+## ----abstract_corpus------------------------------------------------------------------------
 
 final.dt.water.screened <- data.table(read.xlsx("final.dt.water_screened.xlsx"))
 final.dt.food.screened <- data.table(read.xlsx("final.dt.food_screened.xlsx"))
@@ -173,7 +173,7 @@ for (i in names(screened.dt)) {
 }
 
 
-## ----policy_corpus, dependson="full_text_corpus"---------------------------
+## ----policy_corpus, dependson="full_text_corpus"--------------------------------------------
 
 # LOAD IN DIMENSIONS DATASETS (POLICY TEXT) ####################################
 
@@ -215,14 +215,14 @@ for (i in c("water", "food")) {
 }
 
 
-## ----full_text_corpus------------------------------------------------------
+## ----full_text_corpus-----------------------------------------------------------------------
 
 # LOAD IN DIMENSIONS DATASET (FULL TEXT) #######################################
 
 full.text.corpus.water <- fread("full.text.corpus.water.csv")
 
 
-## ----split-----------------------------------------------------------------
+## ----split----------------------------------------------------------------------------------
 
 # SPLIT THE DATASET INTO N FOR RESEARCH ########################################
 
@@ -361,28 +361,22 @@ fwrite(network.dt.claim, "network.dt.claim.csv")
 network.dt <- network.dt[, .(from, to, document.type, nature.claim)]
 cols_to_change <- colnames(network.dt)
 network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
-network.dt <- network.dt[!duplicated(network.dt)]
 
-## ----descriptive_plots, dependson="read_all_datasets", fig.height=1.8, fig.width=6.5----
+
+## ----descriptive_plots, dependson="read_all_datasets", fig.height=1.8, fig.width=6.5--------
 
 # PLOT DESCRIPTIVE STATISTICS ##################################################
 
-# Check proportio of studies making the claim but without providing any citation and 
-# not being primary papers (!modelling) ----------------------------------------
+total.rows <- nrow(network.dt)
 
-no.citation.total <- nrow(network.dt.claim[nature.claim == "no citation" & 
-                                          !document.type == "modelling"])
-no.citation.total / nrow(network.dt.claim) 
+# Check proportion of studies by nature of claim -------------------------------
 
-# Check proportion of studies cited as making the claim, but actually not making
-# the claim --------------------------------------------------------------------
-
-no.claim.total <- nrow(network.dt.claim[nature.claim == "no claim"])
-no.claim.total / nrow(network.dt.claim) 
+network.dt.claim[, .N, nature.claim] %>%
+  .[, total:= total.rows] %>%
+  .[, fraction:= N / total] %>%
+  print()
 
 # Count document type by nature of claim ---------------------------------------
-
-total.rows <- nrow(network.dt)
 
 a <- network.dt[, .N, .(nature.claim, document.type)] %>%
   .[, total.rows:= total.rows] %>%
@@ -416,14 +410,6 @@ b <- network.dt[, .(without.citation = sum(is.na(to)),
 
 plot_grid(a, b, ncol = 2, rel_widths = c(0.63, 0.37), labels = "auto")
 
-# FUNCTION TO EXTRACT YEARS ####################################################
-
-network.dt.claim[, .N, nature.claim] %>%
-  .[, total:= total.rows] %>%
-  .[, fraction:= N / total] %>%
-  print()
-
-network.dt[is.na(document.type)]
 
 ## ----citations_support_claim, dependson="read_all_datasets", fig.height=1.8, fig.width=2.2, warning=FALSE----
 
@@ -434,10 +420,10 @@ network.dt[, .N, from] %>%
   ggplot(., aes(N)) +
   geom_histogram() + 
   theme_AP() +
-  labs(x = "Nº citations supporting claim", y = "Counts")
+  labs(x = "Nº citations supporting claim \n per paper", y = "Counts")
 
 
-## ----network_metrics, dependson="read_all_datasets"------------------------
+## ----network_metrics, dependson="read_all_datasets"-----------------------------------------
 
 # CALCULATE NETWORK METRICS ####################################################
 
@@ -468,6 +454,8 @@ network_metrics <- data.table(node = V(citation_graph)$name,
                               # node is within the graph.
                               degree = degree(citation_graph, mode = "in"),
                               
+                              degree.out = degree(citation_graph, mode = "out"),
+                              
                               # Betweenness centrality of a node: Measures the 
                               # extent to which a node lies on the shortest 
                               # paths between all pairs of other nodes in the graph. 
@@ -490,15 +478,17 @@ network_metrics <- data.table(node = V(citation_graph)$name,
 max.number <- 3
 
 degree.nodes <- network_metrics[order(-degree)][1:max.number]
+degree.nodes.out <- network_metrics[order(-degree.out)][1:max.number]
 betweenness.nodes <- network_metrics[order(-betweenness)][1:max.number]
 pagerank.nodes <- network_metrics[order(-closeness)][1:max.number]
 
 degree.nodes
+degree.nodes.out
 betweenness.nodes
 pagerank.nodes
 
 
-## ----add_features, dependson=c("read_all_datasets", "network_metrics")-----
+## ----add_features, dependson=c("read_all_datasets", "network_metrics")----------------------
 
 # ADD FEATURES TO NODES ########################################################
 
@@ -532,25 +522,28 @@ graph <- graph %>%
   mutate(nature.claim = final.vec.nature.claim, 
          document.type = final.vec.document.type, 
          degree = network_metrics$degree, 
+         degree.out = network_metrics$degree.out,
          betweenness = network_metrics$betweenness, 
          pagerank = network_metrics$pagerank)
 
+
+## ----calculate_proportion, dependson="add_features"-----------------------------------------
+
+# NUMBER OF NODES ##############################################################
+
+V(graph)
+
+# NUMBER OF EDGES ##############################################################
+
+ecount(graph)
 
 # PROPORTION OF ALL PATHS THAT PASS THROUGH FIVE HIGHEST BETWEENNESS NODES ######
 
 bc <- betweenness(graph)
 nodes_of_interest <- sort(bc, decreasing = TRUE)[1:5] 
 total_paths <- choose(vcount(graph), 2)  # Total number of paths
+total_paths
 sum(nodes_of_interest) / total_paths
-
-da <- network.dt[nature.claim == "no claim"][, from]
-
-
-# Filter nodes based on "nature.claim" attribute
-filtered_nodes <- V(your_tbl_graph)[your_tbl_graph$nature.claim %in% c("no claim", "no citation")]
-
-# Calculate the proportion of paths ending in filtered nodes
-proportion <- sum(bc[filtered_nodes]) / total_paths
 
 # PROPORTION OF LINKS CONNECTED TO THE 5 NODES WITH HIGHEST DEGREE #############
 
@@ -561,10 +554,7 @@ sum(nodes_of_interest_degree) / total_edges
 
 
 
-
-
-
-## ----plot_network, dependson="add_features", fig.height=6, fig.width=7-----
+## ----plot_network, dependson="add_features", fig.height=6, fig.width=7----------------------
 
 # PLOT NETWORK #################################################################
 
@@ -652,209 +642,75 @@ ggraph(graph, layout = "igraph", algorithm = "nicely") +
         legend.position = "right") 
 
 
-## ----preliminary_analysis_abstract_water-----------------------------------
+## ----analysis_network_paths, dependson="add_features"---------------------------------------
 
-# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
+# COUNT THE NUMBER OF NODES WITH PATHS ULTIMATELY LEADING TO NODES
+# THAT DO NOT MAKE THE CITATION ################################################
 
-tmp <- list()
-names.files <- c("WORK", "NETWORK")
-cols_of_interest <- c("title", "author", "claim", "citation")
-files.abstract.water <- paste(paste("abstract.corpus.water2_", names.files, sep = ""), "xlsx", sep = ".")
+# Function: loop through each node that do not make the claim to find all nodes 
+# connected to it --------------------------------------------------------------
 
-# READ IN DATASETS AND TURN TO LOWERCAPS #######################################
-
-for (i in 1:length(files.abstract.water)) {
+nodes_to_no_claim_node_fun <- function(g, terminal_nodes) {
   
-  tmp[[i]] <- data.table(read.xlsx(files.abstract.water[i]))
-  
-  if (i == 1) {
-    
-    tmp[[i]][, title:= tolower(title)]
-    
-  } else {
-    
-    tmp[[i]][, (cols_of_interest):= lapply(.SD, tolower), .SDcols = (cols_of_interest)]
+  if (!is.igraph(g)) {
+    g <- as.igraph(g)
   }
+  
+  all_predecessors <- vector("list", length(terminal_nodes))
+  
+  for (i in seq_along(terminal_nodes)) {
+    
+    terminal_node <- terminal_nodes[i]
+    predecessors <- subcomponent(g, terminal_node, mode = "in")
+    all_predecessors[[i]] <- predecessors
+  }
+  
+  unique_predecessors <- unique(names(unlist(all_predecessors)))
+  
+  return(unique_predecessors)
+  
 }
 
-names(tmp) <- names.files
 
-# CLEAN DATASET ################################################################
+## ----analysis_paths_nodes, dependson="analysis_network_paths"-------------------------------
 
-abstract.water.dt <- merge(tmp[[1]][claim.in.text == "F"], tmp[[2]], by = c("doi", "title"), all = TRUE)
-abstract.water.dt[, claim.in.text:= ifelse(is.na(claim.in.text), "TRUE", "FALSE")]
-abstract.water.dt[, c(cols_of_interest, "nature.claim"):= lapply(.SD, trimws), .SDcols = c(cols_of_interest, "nature.claim")]
-abstract.water.dt[, year:= ifelse(is.na(year), as.numeric(gsub("\\D", "", abstract.water.dt$author)), year)]
+# CALCULATE
 
+# Extract name of all nodes ----------------------------------------------------
 
-## ----plot_bars, dependson="preliminary_analysis_abstract_water", fig.height=2, fig.width=5.8, warning=FALSE----
-
-# PRELIMINARY ANALYSIS #########################################################
-
-a <- tmp$WORK[claim.in.text %in% c("T", "F")] %>%
-  .[, .N, claim.in.text] %>%
-  ggplot(., aes(claim.in.text, N)) +
-  geom_bar(stat = "identity") +
-  labs(x = "", y = "Nº studies") +
-  theme_AP()
-
-b <- tmp$NETWORK %>%
-  .[complete.cases(.$nature.claim), ] %>%
-  .[, nature.claim:= trimws(nature.claim)] %>%
-  .[, .N, nature.claim] %>%
-  ggplot(., aes(reorder(nature.claim, -N), N)) +
-  scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
-  geom_bar(stat = "identity") + 
-  labs(x = "", y = "") +
-  theme_AP()
-
-c <- tmp$NETWORK %>%
-  .[, .N, document.type] %>%
-  ggplot(., aes(reorder(document.type, -N), N)) +
-  geom_bar(stat = "identity") + 
-  labs(x = "", y = "") +
-  theme_AP()
-
-plot_grid(a, b, c, ncol = 3)
-
-
-## ----network_analysis_water_abstract---------------------------------------
-
-# NETWORK ANALYSIS #############################################################
-
-# Arrange data -----------------------------------------------------------------
-network.dt <- copy(tmp$NETWORK)
-setnames(network.dt, c("author", "citation"), c("from", "to"))
-network.dt <- network.dt[, .(from, to, document.type, nature.claim)]
-cols_to_change <- colnames(network.dt)
-network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
-
-# only complete cases ----------------------------------------------------------
-network.dt.complete <- network.dt[complete.cases(network.dt$to), ]
-
-# Transform to graph -----------------------------------------------------------
-citation_graph <- graph_from_data_frame(d = network.dt.complete, directed = TRUE)
-
-# Calculate network metrics ----------------------------------------------------
-
-edge_density(citation_graph)
-network_metrics <- data.table(node = V(citation_graph)$name,
-                              
-                              # Degree of a node: The number of connections or 
-                              # edges linked to that node. 
-                              # It represents how well-connected or central a 
-                              # node is within the graph.
-                              degree = degree(citation_graph, mode = "in"),
-                              
-                              # Betweenness centrality of a node: Measures the 
-                              # extent to which a node lies on the shortest 
-                              # paths between all pairs of other nodes in the graph. 
-                              # Nodes with high betweenness centrality act as 
-                              # bridges or intermediaries, facilitating 
-                              # communication and information flow between other nodes.
-                              betweenness = betweenness(citation_graph),
-                              
-                              # Closeness centrality of a node: Measures how 
-                              # close a node is to all other nodes in the graph, 
-                              # taking into account the length of the shortest paths. 
-                              # Nodes with high closeness centrality are able to 
-                              # efficiently communicate or interact with other 
-                              # nodes in the graph.
-                              closeness = closeness(citation_graph),
-                              pagerank = page_rank(citation_graph)$vector
-)
-
-network_metrics[order(-degree)][1:5]
-network_metrics[order(-betweenness)][1:5]
-network_metrics[order(-closeness)][1:5]
-
-
-## ----plot_network_water_abstract, dependson="network_analysis_water_abstract", dev = "pdf", fig.height=8.5, fig.width=7----
-
-# PLOT NETWORK #################################################################
-
-# Retrieve a vector with the node names ----------------------------------------
-
-graph <- tidygraph::as_tbl_graph(network.dt.complete, directed = TRUE) 
-vec.names <- graph %>%
+all_nodes <- graph %>%
   activate(nodes) %>%
-  pull() %>%
-  data.table(name = .)
+  pull(name)
 
-# Merge with info from the network.dt ------------------------------------------
+# Extract name of nodes that do not make the claim -----------------------------
 
-vec.nature.claim <- merge(vec.names, unique(network.dt[, .(from, nature.claim)]), 
-      by.x = "name", by.y = "from", all.x = TRUE) 
-
-# Merge with the correct order -------------------------------------------------
-
-order_indices <- match(vec.names$name, vec.nature.claim$name)
-final.vec.nature.claim <- vec.nature.claim[order_indices, ] %>%
-  .[, nature.claim] 
-
-# Attach to the graph ----------------------------------------------------------
-
-graph <- graph %>%
+no.claim_nodes <- graph %>%
   activate(nodes) %>%
-  mutate(nature.claim = final.vec.nature.claim)
+  filter(degree.out == 0 & nature.claim == "no claim") %>%
+  pull(., "name")
 
-# Plot network -----------------------------------------------------------------
+# Extract name of nodes that do not make the claim and those that make 
+# the claim but do not cite anybody --------------------------------------------
 
-ggraph(graph, layout = "igraph", algorithm = "nicely") + 
-  geom_edge_link(arrow = arrow(length = unit(1.5, 'mm')), 
-                 end_cap = circle(1, "mm")) + 
-  geom_node_point(size = 2, aes(color = nature.claim)) +
-  geom_node_text(aes(label = name), repel = TRUE, size = 2.1) +
-  labs(x = "", y = "") +
-  scale_color_discrete(name = "") +
-  theme_AP() + 
-  theme(axis.text.x = element_blank(), 
-        axis.ticks.x = element_blank(), 
-        axis.text.y = element_blank(), 
-        axis.ticks.y = element_blank(), 
-        legend.position = "top") 
+no.claim.and.no.citation.nodes <- graph %>%
+  activate(nodes) %>%
+  filter(degree.out == 0 & nature.claim == "no claim" | nature.claim == "no citation" ) %>%
+  pull(., "name")
 
+# Run the function -------------------------------------------------------------
 
-## ----aquastat_data, fig.height=2, fig.width=2.2----------------------------
+out <- lapply(list(no.claim_nodes, no.claim.and.no.citation.nodes), function(x)
+  sort(nodes_to_no_claim_node_fun(graph, terminal_nodes = x)))
 
-# AQUASTAT DATA ################################################################
+names(out) <- c("path ending in no claim", "path ending in no claim or no citation")
+out
 
-# Read in dataset --------------------------------------------------------------
+# Calculate proportions --------------------------------------------------------
 
-aquastat <- data.table(read.xlsx("aquastat_dt.xlsx"))
-aquastat.dt <- aquastat[Variable == "Agricultural water withdrawal as % of total water withdrawal"] %>%
-  .[, .(Area, Year, Value, Symbol)] %>%
-  .[Year == 2020] %>%
-  .[, Symbol:= ifelse(Symbol == "E", "estimated", "inputed")]
-
-# Count proportion of estimated and imputed values
-# E: Estimate either calculated as sum or identify (yield) from 
-# official values or from an AQUASTAT estimation.
-# I: Imputed (carry forward, vertical imputation, linear interpolation)
-
-# Calculate mean and median ----------------------------------------------------
-
-mean.and.median <- aquastat.dt[, .(mean = mean(Value), median = median(Value))] %>%
-  melt(., measure.vars = colnames(.))
-  
-# Plot histogram ---------------------------------------------------------------
-
-a <- ggplot(aquastat.dt, aes(Value)) +
-  geom_histogram(color = "black", aes(fill = Symbol)) +
-  geom_vline(data = mean.and.median, aes(xintercept = value, color = variable), 
-             show.legend = FALSE) +
-  geom_vline(xintercept = 70, lty = 2) +
-  scale_fill_manual(name = "", 
-                    values = wes_palette(name = "Cavalcanti1", 5)) +
-  theme_AP() +
-  labs(x = "Percent (\\%)", y = "Count") +
-  theme(legend.position = "top")
-
-a
+lapply(out, function(x) length(x) / length(all_nodes))
 
 
-
-## ----session_information---------------------------------------------------
+## ----session_information--------------------------------------------------------------------
 
 # SESSION INFORMATION ##########################################################
 
