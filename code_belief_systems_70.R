@@ -315,6 +315,19 @@ sub(".*\\.([^\\.]+)_.*", "\\1", all.files)
 
 # CLEAN AND MERGE DATASETS #####################################################
 
+dataset.works <- all.files[str_detect(all.files, "_WORK")]
+dataset.works.topics <- sub(".*\\.([^\\.]+)_.*", "\\1", dataset.works)
+
+tmp.works <- tmp[dataset.works]
+names(tmp.works) <- dataset.works.topics
+lapply(tmp.works, function(dt) dt[, .(doi, title, claim.in.text)]) %>%
+  rbindlist(., idcol = "topic") %>%
+  .[, .N, .(topic, claim.in.text)]
+
+
+
+
+
 dataset.networks <- all.files[str_detect(all.files, "NETWORK")]
 dataset.networks.topics <- sub(".*\\.([^\\.]+)_.*", "\\1", dataset.networks)
 
@@ -602,6 +615,7 @@ lapply(graph.final, function(graph) {
 # PLOT NETWORK #################################################################
 
 seed <- 123
+selected_colors <- c("darkblue", "lightgreen", "orange", "red", "grey")
 
 # by nature of claim -----------------------------------------------------------
 
@@ -621,7 +635,7 @@ for(i in names(graph.final)) {
                    repel = TRUE, size = 2.2) +
     labs(x = "", y = "") +
     scale_color_manual(name = "", 
-                       values = wes_palette(name = "Cavalcanti1", 5)) +
+                       values = selected_colors) +
     theme_AP() + 
     theme(axis.text.x = element_blank(), 
           axis.ticks.x = element_blank(), 
@@ -631,6 +645,9 @@ for(i in names(graph.final)) {
 }
   
 p1
+
+network.dt[topic == "water"] %>%
+  .[is.na(document.type)]
 
 # Label the nodes with highest betweenness -------------------------------------
 

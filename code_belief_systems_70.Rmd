@@ -362,6 +362,19 @@ sub(".*\\.([^\\.]+)_.*", "\\1", all.files)
 
 # CLEAN AND MERGE DATASETS #####################################################
 
+# Work datasets ----------------------------------------------------------------
+
+dataset.works <- all.files[str_detect(all.files, "_WORK")]
+dataset.works.topics <- sub(".*\\.([^\\.]+)_.*", "\\1", dataset.works)
+
+tmp.works <- tmp[dataset.works]
+names(tmp.works) <- dataset.works.topics
+lapply(tmp.works, function(dt) dt[, .(doi, title, claim.in.text)]) %>%
+  rbindlist(., idcol = "topic") %>%
+  .[, .N, .(topic, claim.in.text)]
+
+# Network datasets -------------------------------------------------------------
+
 dataset.networks <- all.files[str_detect(all.files, "NETWORK")]
 dataset.networks.topics <- sub(".*\\.([^\\.]+)_.*", "\\1", dataset.networks)
 
@@ -417,7 +430,7 @@ cols_to_change <- colnames(network.dt)
 network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
 ```
 
-```{r descriptive_plots, dependson="read_all_datasets", fig.height=1.8, fig.width=6.5}
+```{r descriptive_plots, dependson="read_all_datasets", fig.height=2.2, fig.width=6.5}
 
 # PLOT DESCRIPTIVE STATISTICS ##################################################
 
@@ -462,10 +475,10 @@ b <- network.dt[, .(without.citation = sum(is.na(to)),
 
 # merge ------------------------------------------------------------------------
 
-plot_grid(a, b, ncol = 2, rel_widths = c(0.63, 0.37), labels = "auto")
+plot_grid(a, b, ncol = 2, rel_widths = c(0.6, 0.4), labels = "auto")
 ```
 
-```{r citations_support_claim, dependson="read_all_datasets", fig.height=1.8, fig.width=2.2, warning=FALSE}
+```{r citations_support_claim, dependson="read_all_datasets", fig.height=1.6, fig.width=2.7, warning=FALSE}
 
 # PLOT DISTRIBUTION OF CITATION SUPPORTING THE CLAIM ###########################
 
@@ -473,9 +486,11 @@ network.dt[, .N, .(from, topic)] %>%
   .[order(-N)] %>%
   ggplot(., aes(N)) +
   geom_histogram() + 
-  facet_grid(~topic, space = "free") +
+  facet_wrap(~topic, scale = "free_y") +
+  scale_x_continuous(breaks = breaks_pretty(n = 3)) +
+  scale_y_continuous(breaks = breaks_pretty(n = 3)) +
   theme_AP() +
-  labs(x = "Nº citations supporting claim \n per paper", y = "Counts")
+  labs(x = "Nº citations supporting claim \n per paper", y = "Nº papers")
 ```
 
 ## Network metrics
@@ -654,6 +669,7 @@ lapply(graph.final, function(graph) {
 # PLOT NETWORK #################################################################
 
 seed <- 123
+selected_colors <- c("darkblue", "lightgreen", "orange", "red", "grey")
 
 # by nature of claim -----------------------------------------------------------
 
@@ -673,7 +689,7 @@ for(i in names(graph.final)) {
                    repel = TRUE, size = 2.2) +
     labs(x = "", y = "") +
     scale_color_manual(name = "", 
-                       values = wes_palette(name = "Cavalcanti1", 5)) +
+                       values = selected_colors) +
     theme_AP() + 
     theme(axis.text.x = element_blank(), 
           axis.ticks.x = element_blank(), 
@@ -699,7 +715,7 @@ for (i in names(graph.final)) {
                    repel = TRUE, size = 2.2) +
     labs(x = "", y = "") +
     scale_color_manual(name = "", 
-                       values = wes_palette(name = "Cavalcanti1", 5)) +
+                       values = selected_colors) +
     theme_AP() + 
     theme(axis.text.x = element_blank(), 
           axis.ticks.x = element_blank(), 
@@ -749,7 +765,7 @@ for (i in names(graph.final)) {
                    repel = TRUE, size = 2.2) +
     labs(x = "", y = "") +
     scale_color_manual(name = "", 
-                       values = wes_palette(name = "Cavalcanti1", 5)) +
+                       values = selected_colors) +
     theme_AP() + 
     theme(axis.text.x = element_blank(), 
           axis.ticks.x = element_blank(), 
