@@ -1,8 +1,8 @@
-## ----setup, include=FALSE-------------------------------------------------------
+## ----setup, include=FALSE-------------------------------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE)
 
 
-## ----preliminary, warning=FALSE, message=FALSE----------------------------------
+## ----preliminary, warning=FALSE, message=FALSE----------------------------------------------------
 
 #   PRELIMINARY FUNCTIONS ######################################################
 
@@ -31,7 +31,7 @@ theme_AP <- function() {
 }
 
 
-## ----load_and_read, warning=FALSE-----------------------------------------------
+## ----load_and_read, warning=FALSE-----------------------------------------------------------------
 
 # CREATION OF VECTORS WITH NAMES ###############################################
 
@@ -151,7 +151,7 @@ for (i in names(final.dt)) {
 }
 
 
-## ----abstract_corpus------------------------------------------------------------
+## ----abstract_corpus------------------------------------------------------------------------------
 
 final.dt.water.screened <- data.table(read.xlsx("final.dt.water_screened.xlsx"))
 final.dt.food.screened <- data.table(read.xlsx("final.dt.food_screened.xlsx"))
@@ -173,7 +173,7 @@ for (i in names(screened.dt)) {
 }
 
 
-## ----policy_corpus, dependson="full_text_corpus"--------------------------------
+## ----policy_corpus, dependson="full_text_corpus"--------------------------------------------------
 
 # LOAD IN DIMENSIONS DATASETS (POLICY TEXT) ####################################
 
@@ -215,14 +215,14 @@ for (i in c("water", "food")) {
 }
 
 
-## ----full_text_corpus-----------------------------------------------------------
+## ----full_text_corpus-----------------------------------------------------------------------------
 
 # LOAD IN DIMENSIONS DATASET (FULL TEXT) #######################################
 
 full.text.corpus.water <- fread("full.text.corpus.water.csv")
 
 
-## ----split----------------------------------------------------------------------
+## ----split----------------------------------------------------------------------------------------
 
 # SPLIT THE DATASET INTO N FOR RESEARCH ########################################
 
@@ -315,6 +315,8 @@ sub(".*\\.([^\\.]+)_.*", "\\1", all.files)
 
 # CLEAN AND MERGE DATASETS #####################################################
 
+# Work datasets ----------------------------------------------------------------
+
 dataset.works <- all.files[str_detect(all.files, "_WORK")]
 dataset.works.topics <- sub(".*\\.([^\\.]+)_.*", "\\1", dataset.works)
 
@@ -324,9 +326,7 @@ lapply(tmp.works, function(dt) dt[, .(doi, title, claim.in.text)]) %>%
   rbindlist(., idcol = "topic") %>%
   .[, .N, .(topic, claim.in.text)]
 
-
-
-
+# Network datasets -------------------------------------------------------------
 
 dataset.networks <- all.files[str_detect(all.files, "NETWORK")]
 dataset.networks.topics <- sub(".*\\.([^\\.]+)_.*", "\\1", dataset.networks)
@@ -337,13 +337,25 @@ names(tmp2) <- dataset.networks.topics
 network.dt <- rbindlist(tmp2, idcol = "topic") %>%
   .[, policy:= grepl("^policy", doi)]
 
+# Retrieve year ----------------------------------------------------------------
+
+network.dt[, year:= as.integer(sub(".* (\\d{4})[a-z]?$", "\\1", author))]
+
+# move policy to author --------------------------------------------------------
+
 network.dt[, author:= ifelse(policy == TRUE, doi, author)]
 
 # CHECK NUMBER OF FAO AQUASTAT CITES ###########################################
 
-network.dt[citation %like% "fao aquastat"] %>%
-  .[, .N, .(citation, topic)]
+aquastat.cites <- network.dt[citation %like% "fao aquastat"] %>%
+  .[, .N, .(citation, topic)] 
 
+aquastat.cites
+
+oldest.aquastat.cite <- min(as.integer(sub(".* (\\d{4})[a-z]?$", "\\1", 
+                                           aquastat.cites$citation)), 
+    na.rm = TRUE)
+  
 # WRITE LOOKUP TABLE TO CHECK ALREADY RETRIEVED STUDIES ########################
 
 lookup.dt <- network.dt[, .(doi, title, author, topic)] %>%
@@ -378,12 +390,12 @@ fwrite(network.dt.claim, "network.dt.claim.csv")
 
 # Convert all to lower caps ----------------------------------------------------
 
-network.dt <- network.dt[, .(from, to, document.type, nature.claim, topic)]
+network.dt <- network.dt[, .(from, to, year, document.type, nature.claim, topic)]
 cols_to_change <- colnames(network.dt)
 network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
 
 
-## ----descriptive_plots, dependson="read_all_datasets", fig.height=1.8, fig.width=6.5----
+## ----descriptive_plots, dependson="read_all_datasets", fig.height=2.2, fig.width=6.5--------------
 
 # PLOT DESCRIPTIVE STATISTICS ##################################################
 
@@ -428,10 +440,10 @@ b <- network.dt[, .(without.citation = sum(is.na(to)),
 
 # merge ------------------------------------------------------------------------
 
-plot_grid(a, b, ncol = 2, rel_widths = c(0.63, 0.37), labels = "auto")
+plot_grid(a, b, ncol = 2, rel_widths = c(0.6, 0.4), labels = "auto")
 
 
-## ----citations_support_claim, dependson="read_all_datasets", fig.height=1.8, fig.width=2.2, warning=FALSE----
+## ----citations_support_claim, dependson="read_all_datasets", fig.height=1.6, fig.width=2.7, warning=FALSE----
 
 # PLOT DISTRIBUTION OF CITATION SUPPORTING THE CLAIM ###########################
 
@@ -439,12 +451,14 @@ network.dt[, .N, .(from, topic)] %>%
   .[order(-N)] %>%
   ggplot(., aes(N)) +
   geom_histogram() + 
-  facet_grid(~topic, space = "free") +
+  facet_wrap(~topic, scale = "free_y") +
+  scale_x_continuous(breaks = breaks_pretty(n = 3)) +
+  scale_y_continuous(breaks = breaks_pretty(n = 3)) +
   theme_AP() +
-  labs(x = "Nº citations supporting claim \n per paper", y = "Counts")
+  labs(x = "Nº citations supporting claim \n per paper", y = "Nº papers")
 
 
-## ----network_metrics, dependson="read_all_datasets"-----------------------------
+## ----network_metrics, dependson="read_all_datasets"-----------------------------------------------
 
 # CALCULATE NETWORK METRICS ####################################################
 
@@ -512,7 +526,7 @@ betweenness.nodes
 pagerank.nodes
 
 
-## ----add_features, dependson=c("read_all_datasets", "network_metrics")----------
+## ----add_features, dependson=c("read_all_datasets", "network_metrics")----------------------------
 
 # ADD FEATURES TO NODES ########################################################
 
@@ -536,7 +550,7 @@ vec.nature.claim <- list()
 
 for(i in names(tmp.network)) {
   
-  vec.nature.claim[[i]] <- merge(merge(vec.names[[i]], unique(tmp.network[[i]][, .(from, nature.claim)]), 
+  vec.nature.claim[[i]] <- merge(merge(vec.names[[i]], unique(tmp.network[[i]][, .(from, year, nature.claim)]), 
                                        by.x = "name", by.y = "from", all.x = TRUE), 
                                  unique(tmp.network[[i]][, .(from, document.type)]), 
                                  by.x = "name", by.y = "from", all.x = TRUE)
@@ -544,7 +558,7 @@ for(i in names(tmp.network)) {
 
 # Merge with the correct order -------------------------------------------------
 
-order_indices <- final.vec.nature.claim <- final.vec.document.type <- list()
+order_indices <- final.vec.nature.claim <- final.vec.document.type <- final.vec.year <- list()
 
 for (i in names(vec.names)) {
   
@@ -553,6 +567,9 @@ for (i in names(vec.names)) {
     .[, nature.claim] 
   final.vec.document.type[[i]] <- vec.nature.claim[[i]][order_indices[[i]], ] %>%
     .[, document.type] 
+  final.vec.year[[i]] <- vec.nature.claim[[i]][order_indices[[i]], ] %>%
+    .[, year] %>%
+    as.numeric()
 }
 
 # Attach to the graph ----------------------------------------------------------
@@ -565,6 +582,7 @@ for (i in names(graph)) {
     activate(nodes) %>%
     mutate(nature.claim = final.vec.nature.claim[[i]], 
            document.type = final.vec.document.type[[i]], 
+           year = final.vec.year[[i]],
            degree = network_metrics[[i]]$degree, 
            degree.out = network_metrics[[i]]$degree.out,
            betweenness = network_metrics[[i]]$betweenness, 
@@ -574,7 +592,7 @@ for (i in names(graph)) {
 }
 
 
-## ----calculate_proportion, dependson="add_features"-----------------------------
+## ----calculate_proportion, dependson="add_features"-----------------------------------------------
 
 # NUMBER OF NODES ##############################################################
 
@@ -610,7 +628,7 @@ lapply(graph.final, function(graph) {
 
 
 
-## ----plot_network, dependson="add_features", fig.height=6, fig.width=7----------
+## ----plot_network, dependson="add_features", fig.height=6, fig.width=7----------------------------
 
 # PLOT NETWORK #################################################################
 
@@ -646,9 +664,6 @@ for(i in names(graph.final)) {
   
 p1
 
-network.dt[topic == "water"] %>%
-  .[is.na(document.type)]
-
 # Label the nodes with highest betweenness -------------------------------------
 
 for (i in names(graph.final)) {
@@ -664,7 +679,7 @@ for (i in names(graph.final)) {
                    repel = TRUE, size = 2.2) +
     labs(x = "", y = "") +
     scale_color_manual(name = "", 
-                       values = wes_palette(name = "Cavalcanti1", 5)) +
+                       values = selected_colors) +
     theme_AP() + 
     theme(axis.text.x = element_blank(), 
           axis.ticks.x = element_blank(), 
@@ -714,7 +729,7 @@ for (i in names(graph.final)) {
                    repel = TRUE, size = 2.2) +
     labs(x = "", y = "") +
     scale_color_manual(name = "", 
-                       values = wes_palette(name = "Cavalcanti1", 5)) +
+                       values = selected_colors) +
     theme_AP() + 
     theme(axis.text.x = element_blank(), 
           axis.ticks.x = element_blank(), 
@@ -726,7 +741,7 @@ for (i in names(graph.final)) {
 p4
 
 
-## ----analysis_network_paths, dependson="add_features"---------------------------
+## ----analysis_network_paths, dependson="add_features"---------------------------------------------
 
 # COUNT THE NUMBER OF NODES WITH PATHS ULTIMATELY LEADING TO NODES
 # THAT DO NOT MAKE THE CITATION ################################################
@@ -756,7 +771,7 @@ nodes_to_no_claim_node_fun <- function(g, terminal_nodes) {
 }
 
 
-## ----analysis_paths_nodes, dependson="analysis_network_paths"-------------------
+## ----analysis_paths_nodes, dependson="analysis_network_paths"-------------------------------------
 
 # CALCULATE
 
@@ -813,7 +828,7 @@ for(i in names(tmp)) {
 out
 
 
-## ----session_information--------------------------------------------------------
+## ----session_information--------------------------------------------------------------------------
 
 # SESSION INFORMATION ##########################################################
 

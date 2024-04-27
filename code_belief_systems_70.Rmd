@@ -384,12 +384,24 @@ names(tmp2) <- dataset.networks.topics
 network.dt <- rbindlist(tmp2, idcol = "topic") %>%
   .[, policy:= grepl("^policy", doi)]
 
+# Retrieve year ----------------------------------------------------------------
+
+network.dt[, year:= as.integer(sub(".* (\\d{4})[a-z]?$", "\\1", author))]
+
+# move policy to author --------------------------------------------------------
+
 network.dt[, author:= ifelse(policy == TRUE, doi, author)]
 
 # CHECK NUMBER OF FAO AQUASTAT CITES ###########################################
 
-network.dt[citation %like% "fao aquastat"] %>%
-  .[, .N, .(citation, topic)]
+aquastat.cites <- network.dt[citation %like% "fao aquastat"] %>%
+  .[, .N, .(citation, topic)] 
+
+aquastat.cites
+
+oldest.aquastat.cite <- min(as.integer(sub(".* (\\d{4})[a-z]?$", "\\1", 
+                                           aquastat.cites$citation)), 
+    na.rm = TRUE)
 
 # WRITE LOOKUP TABLE TO CHECK ALREADY RETRIEVED STUDIES ########################
 
@@ -425,7 +437,7 @@ fwrite(network.dt.claim, "network.dt.claim.csv")
 
 # Convert all to lower caps ----------------------------------------------------
 
-network.dt <- network.dt[, .(from, to, document.type, nature.claim, topic)]
+network.dt <- network.dt[, .(from, to, year, document.type, nature.claim, topic)]
 cols_to_change <- colnames(network.dt)
 network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
 ```
@@ -589,7 +601,7 @@ vec.nature.claim <- list()
 
 for(i in names(tmp.network)) {
   
-  vec.nature.claim[[i]] <- merge(merge(vec.names[[i]], unique(tmp.network[[i]][, .(from, nature.claim)]), 
+  vec.nature.claim[[i]] <- merge(merge(vec.names[[i]], unique(tmp.network[[i]][, .(from, year, nature.claim)]), 
                                        by.x = "name", by.y = "from", all.x = TRUE), 
                                  unique(tmp.network[[i]][, .(from, document.type)]), 
                                  by.x = "name", by.y = "from", all.x = TRUE)
@@ -597,7 +609,7 @@ for(i in names(tmp.network)) {
 
 # Merge with the correct order -------------------------------------------------
 
-order_indices <- final.vec.nature.claim <- final.vec.document.type <- list()
+order_indices <- final.vec.nature.claim <- final.vec.document.type <- final.vec.year <- list()
 
 for (i in names(vec.names)) {
   
@@ -606,6 +618,9 @@ for (i in names(vec.names)) {
     .[, nature.claim] 
   final.vec.document.type[[i]] <- vec.nature.claim[[i]][order_indices[[i]], ] %>%
     .[, document.type] 
+  final.vec.year[[i]] <- vec.nature.claim[[i]][order_indices[[i]], ] %>%
+    .[, year] %>%
+    as.numeric()
 }
 
 # Attach to the graph ----------------------------------------------------------
@@ -618,6 +633,7 @@ for (i in names(graph)) {
     activate(nodes) %>%
     mutate(nature.claim = final.vec.nature.claim[[i]], 
            document.type = final.vec.document.type[[i]], 
+           year = final.vec.year[[i]],
            degree = network_metrics[[i]]$degree, 
            degree.out = network_metrics[[i]]$degree.out,
            betweenness = network_metrics[[i]]$betweenness, 
@@ -775,6 +791,83 @@ for (i in names(graph.final)) {
 }
 
 p4
+```
+
+## Network through time
+
+```{r network_time, dependson="add_features"}
+
+# PREPARE DATA TO PLOT NETWORK THROUGH TIME ####################################
+
+# Extract vector with names ----------------------------------------------------
+
+location_aquastat <- graph.final[[2]] %>%
+  activate(nodes) %>%
+  data.frame() %>%
+  pull(name) %>%
+  grep("aquastat", .)
+
+# Extract vector with years ----------------------------------------------------
+
+v_years <- graph.final[[2]] %>%
+  activate(nodes) %>%
+  data.frame() %>%
+  pull(year) 
+
+# Substitute fao aquastat without year with the oldest aqustat citation --------
+
+v_years[location_aquastat] <- oldest.aquastat.cite
+
+# Find NA values ---------------------------------------------------------------
+
+na_indices <- is.na(v_years)
+sum(na_indices)
+
+# Generate random values to replace NA -----------------------------------------
+
+random_values <- sample(2000:2020, sum(na_indices), replace = TRUE)
+
+# Replace NA with random values ------------------------------------------------
+
+v_years[na_indices] <- random_values
+
+# Define the coordinates--------------------------------------------------------
+  
+y_positions <- runif(length(v_years), min = -3, max = 3)  # Random y-axis positions
+layout <- cbind(v_years, y_positions)  # Use actual years for x-axis
+layout_matrix <- as.matrix(layout)
+colnames(layout_matrix) <- c("x", "y")
+
+```
+
+```{r plot_network_time, dependson="network_time"}
+
+# PLOT NETWORK THROUGH TIME ####################################################
+
+# Set seed ---------------------------------------------------------------------
+
+set.seed(seed)
+
+# Plot -------------------------------------------------------------------------
+
+ggraph(graph.final[[2]], layout = layout_matrix, algorithm = "nicely") +
+  geom_edge_link(arrow = arrow(length = unit(1.8, "mm")), 
+                 end_cap = circle(1, "mm"), 
+                 color = "grey", 
+                 alpha = 0.4) + 
+  geom_node_point(aes(color = nature.claim, size = degree)) +
+  geom_node_text(aes(label = ifelse(nature.claim == "modelling", name, NA)), 
+                 repel = TRUE, size = 2.2) +
+  scale_color_manual(name = "", 
+                     values = selected_colors) +
+  scale_x_continuous(name = "Year", 
+                     limits = range(v_years), 
+                     breaks = seq(min(v_years), 
+                                  max(v_years), by = 5)) +
+  labs(x = "Year", y = "") +
+  theme_AP() +
+  theme(axis.text.y = element_blank(), 
+        axis.ticks.y = element_blank()) 
 ```
 
 # Analysis of paths
