@@ -41,7 +41,7 @@ knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE)
 
 sensobol::load_packages(c("openxlsx", "data.table", "tidyverse", "bibliometrix", 
                           "igraph", "ggraph", "cowplot", "tidygraph", "benchmarkme", 
-                          "parallel", "wesanderson", "scales"))
+                          "parallel", "wesanderson", "scales", "countrycode"))
 
 # Create custom theme
 theme_AP <- function() {
@@ -323,7 +323,7 @@ for (i in 1:length(survey.dt.split)) {
 
 ```{r read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")}
 
-# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
+# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ##############################
 
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
@@ -857,7 +857,7 @@ ggraph(graph.final[[2]], layout = layout_matrix, algorithm = "nicely") +
                  alpha = 0.4) + 
   geom_node_point(aes(color = nature.claim, size = degree)) +
   geom_node_text(aes(label = ifelse(nature.claim == "modelling", name, NA)), 
-                 repel = TRUE, size = 2.2) +
+                 repel = TRUE, size = 2.5) +
   scale_color_manual(name = "", 
                      values = selected_colors) +
   scale_x_continuous(name = "Year", 
@@ -954,6 +954,85 @@ out <- list()
 
 for(i in names(tmp)) {
   out[[i]] <- lapply(tmp[[i]], function(x) length(x) / length(all_nodes[[i]]))
+}
+
+out
+```
+
+# Study of Aquastat values
+
+```{r aquastat_analysis}
+
+# STUDY OF AQUASTAT PERCENTAGES ################################################
+
+# Read in aquastat dataset -----------------------------------------------------
+
+aquastat.dt <- read.xlsx("aquastat_dt.xlsx") %>%
+  data.table() %>%
+  .[Year == 2020] %>%
+  setnames(., c("Value", "Area"), c("percentage", "country")) %>%
+  .[, .(country, percentage)] %>%
+  .[, data:= "aquastat 2020"] %>%
+  .[, country:= countrycode(country, origin = "country.name", destination = "country.name")] 
+
+aquastat.dt[, continent:= countrycode(country, origin = "country.name", destination = "continent")]
+  
+# Read in world resources institute dataset ------------------------------------
+
+wri <- fread("world_resources_institut_guide_to_the_global_environment_1994.csv") %>%
+  .[order(country)] %>%
+  .[, data:= "wri 1994"] %>%
+  .[, country:= countrycode(country, origin = "country.name", destination = "country.name")]
+
+wri[, continent:= countrycode(country, origin = "country.name", destination = "continent")]
+```
+
+```{r plot_aquastat_analysis, dependson="aquastat_analysis", fig.height=1.8, fig.width=4}
+
+# Compare distributions --------------------------------------------------------
+
+dt.comparison <- rbind(aquastat.dt, wri) %>%
+  .[, data:= factor(data, levels = c("wri 1994", "aquastat 2020"))]
+
+dt.stats.comparison <- dt.comparison[, .(mean = mean(percentage, na.rm = TRUE), 
+                                         median = median(percentage, na.rm = TRUE)), data] %>%
+  melt(., measure.vars = c("mean", "median"))
+  
+  
+ggplot(dt.comparison, aes(percentage)) +
+  geom_histogram(color = "black", fill = "grey") +
+  facet_wrap(~data) +
+  geom_vline(data = dt.stats.comparison, aes(xintercept = value, color = variable)) +
+  scale_color_discrete(name = "") +
+  geom_vline(xintercept = 70, lty = 2) +
+  theme_AP()
+```
+
+```{r plot_aquastat_analysis_country, dependson="aquastat_analysis", fig.width=3.5}
+
+# At the country level ---------------------------------------------------------
+
+tmp <- aquastat.dt[wri, on = c("country", "continent")] %>%
+  .[, .(country,continent, percentage, i.percentage)] %>%
+  setnames(., c("percentage", "i.percentage"), c("aquastat 2020", "wri 1994")) %>%
+  melt(., measure.vars = c("aquastat 2020", "wri 1994")) %>%
+  .[, country:= ifelse(country == "Trinidad & Tobago", "Trinidad and Tobago", country)] %>%
+  na.omit() %>%
+  split(., .$continent)
+
+out <- list()
+
+for(i in names(tmp)) {
+  
+  out[[i]] <- ggplot(tmp[[i]], aes(reorder(country, value), 
+                                   value, color = variable)) +
+    coord_flip() +
+    scale_color_discrete(name = "") +
+    geom_point() +
+    theme_AP() +
+    theme(legend.position = "top") +
+    labs(x = "", y = "percentage") +
+    ggtitle(names(tmp[i]))
 }
 
 out
