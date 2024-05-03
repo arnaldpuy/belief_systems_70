@@ -380,6 +380,10 @@ for (col in c("citation", "author")) {
 
 setnames(network.dt, c("author", "citation"), c("from", "to"))
 
+# Rename category --------------------------------------------------------------
+
+network.dt[, category:= ifelse(!classification == "F", "Uncertain", "Fact")]
+
 # Create copy and remove duplicated --------------------------------------------
 
 network.dt.claim <- copy(network.dt)
@@ -390,10 +394,17 @@ fwrite(network.dt.claim, "network.dt.claim.csv")
 
 # Convert all to lower caps ----------------------------------------------------
 
-network.dt <- network.dt[, .(from, to, year, document.type, nature.claim, topic)]
+network.dt <- network.dt[, .(from, to, year, document.type, nature.claim, 
+                             classification, category, topic)]
 cols_to_change <- colnames(network.dt)
 network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
 
+network.dt[document.type == "NA"]
+network.dt[, .(without.citation = sum(is.na(to)), 
+               with.citation = .N - sum(is.na(to))), .(document.type, topic)] %>%
+  melt(., measure.vars = c("without.citation", "with.citation"))
+
+network.dt[is.na(document.type)]
 
 ## ----descriptive_plots, dependson="read_all_datasets", fig.height=2.2, fig.width=6.5--------------
 
@@ -437,6 +448,7 @@ b <- network.dt[, .(without.citation = sum(is.na(to)),
   labs(x = "", y = "Fraction") +
   facet_grid(topic~variable) + 
   theme_AP()
+
 
 # merge ------------------------------------------------------------------------
 
@@ -552,13 +564,14 @@ for(i in names(tmp.network)) {
   
   vec.nature.claim[[i]] <- merge(merge(vec.names[[i]], unique(tmp.network[[i]][, .(from, year, nature.claim)]), 
                                        by.x = "name", by.y = "from", all.x = TRUE), 
-                                 unique(tmp.network[[i]][, .(from, document.type)]), 
+                                 unique(tmp.network[[i]][, .(from, document.type, classification, category)]), 
                                  by.x = "name", by.y = "from", all.x = TRUE)
 }
 
 # Merge with the correct order -------------------------------------------------
 
-order_indices <- final.vec.nature.claim <- final.vec.document.type <- final.vec.year <- list()
+order_indices <- final.vec.nature.claim <- final.vec.document.type <- 
+  final.vec.year <- final.vec.classification <- final.vec.category <- list()
 
 for (i in names(vec.names)) {
   
@@ -570,6 +583,10 @@ for (i in names(vec.names)) {
   final.vec.year[[i]] <- vec.nature.claim[[i]][order_indices[[i]], ] %>%
     .[, year] %>%
     as.numeric()
+  final.vec.classification[[i]] <- vec.nature.claim[[i]][order_indices[[i]], ] %>%
+    .[, classification]
+  final.vec.category[[i]] <- vec.nature.claim[[i]][order_indices[[i]], ] %>%
+    .[, category]
 }
 
 # Attach to the graph ----------------------------------------------------------
@@ -584,6 +601,8 @@ for (i in names(graph)) {
            document.type = final.vec.document.type[[i]], 
            year = final.vec.year[[i]],
            degree = network_metrics[[i]]$degree, 
+           classification = final.vec.classification[[i]],
+           category = final.vec.category[[i]],
            degree.out = network_metrics[[i]]$degree.out,
            betweenness = network_metrics[[i]]$betweenness, 
            pagerank = network_metrics[[i]]$pagerank)
@@ -639,7 +658,7 @@ selected_colors <- c("darkblue", "lightgreen", "orange", "red", "grey")
 
 # Label the nodes with highest degree ------------------------------------------
 
-p1 <- p2 <- p3 <- p4 <- list()
+p1 <- p2 <- p3 <- p4 <- p5 <- list()
 
 for(i in names(graph.final)) {
   
@@ -741,6 +760,32 @@ for (i in names(graph.final)) {
 p4
 
 
+for(i in names(graph.final)) {
+  
+  set.seed(seed)
+  
+  p5[[i]] <- ggraph(graph.final[[i]], layout = "igraph", algorithm = "nicely") + 
+    geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
+                   end_cap = circle(1, "mm")) + 
+    geom_node_point(aes(color = classification, size = degree)) +
+    geom_node_text(aes(label = ifelse(degree >= min(degree.nodes[[i]]$degree), name, NA)), 
+                   repel = TRUE, size = 2.2) +
+    labs(x = "", y = "") +
+    theme_AP() + 
+    theme(axis.text.x = element_blank(), 
+          axis.ticks.x = element_blank(), 
+          axis.text.y = element_blank(), 
+          axis.ticks.y = element_blank(), 
+          legend.position = "right") 
+}
+
+p5[[2]]
+
+graph.final[[2]] %>%
+  activate(nodes) %>%
+  data.frame() %>%
+  
+
 ## ----analysis_network_paths, dependson="add_features"---------------------------------------------
 
 # COUNT THE NUMBER OF NODES WITH PATHS ULTIMATELY LEADING TO NODES
@@ -810,6 +855,7 @@ for(i in names(graph.final)) {
 }
 
 for(i in names(graph.final)) {
+  
   names(tmp[[i]]) <- c("path ending in no claim", 
                                "path ending in no claim or no citation")
 }

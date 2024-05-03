@@ -323,7 +323,7 @@ for (i in 1:length(survey.dt.split)) {
 
 ```{r read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")}
 
-# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ##############################
+# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
 
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
@@ -427,6 +427,10 @@ for (col in c("citation", "author")) {
 
 setnames(network.dt, c("author", "citation"), c("from", "to"))
 
+# Rename category --------------------------------------------------------------
+
+network.dt[, category:= ifelse(!classification == "F", "Uncertain", "Fact")]
+
 # Create copy and remove duplicated --------------------------------------------
 
 network.dt.claim <- copy(network.dt)
@@ -437,7 +441,8 @@ fwrite(network.dt.claim, "network.dt.claim.csv")
 
 # Convert all to lower caps ----------------------------------------------------
 
-network.dt <- network.dt[, .(from, to, year, document.type, nature.claim, topic)]
+network.dt <- network.dt[, .(from, to, year, document.type, nature.claim, 
+                             classification, category, topic)]
 cols_to_change <- colnames(network.dt)
 network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
 ```
@@ -603,13 +608,14 @@ for(i in names(tmp.network)) {
   
   vec.nature.claim[[i]] <- merge(merge(vec.names[[i]], unique(tmp.network[[i]][, .(from, year, nature.claim)]), 
                                        by.x = "name", by.y = "from", all.x = TRUE), 
-                                 unique(tmp.network[[i]][, .(from, document.type)]), 
+                                 unique(tmp.network[[i]][, .(from, document.type, classification, category)]), 
                                  by.x = "name", by.y = "from", all.x = TRUE)
 }
 
 # Merge with the correct order -------------------------------------------------
 
-order_indices <- final.vec.nature.claim <- final.vec.document.type <- final.vec.year <- list()
+order_indices <- final.vec.nature.claim <- final.vec.document.type <- 
+  final.vec.year <- final.vec.classification <- final.vec.category <- list()
 
 for (i in names(vec.names)) {
   
@@ -621,6 +627,10 @@ for (i in names(vec.names)) {
   final.vec.year[[i]] <- vec.nature.claim[[i]][order_indices[[i]], ] %>%
     .[, year] %>%
     as.numeric()
+  final.vec.classification[[i]] <- vec.nature.claim[[i]][order_indices[[i]], ] %>%
+    .[, classification]
+  final.vec.category[[i]] <- vec.nature.claim[[i]][order_indices[[i]], ] %>%
+    .[, category]
 }
 
 # Attach to the graph ----------------------------------------------------------
@@ -635,6 +645,8 @@ for (i in names(graph)) {
            document.type = final.vec.document.type[[i]], 
            year = final.vec.year[[i]],
            degree = network_metrics[[i]]$degree, 
+           classification = final.vec.classification[[i]],
+           category = final.vec.category[[i]],
            degree.out = network_metrics[[i]]$degree.out,
            betweenness = network_metrics[[i]]$betweenness, 
            pagerank = network_metrics[[i]]$pagerank)
@@ -791,6 +803,111 @@ for (i in names(graph.final)) {
 }
 
 p4
+```
+
+## Uncertainties turned into facts
+
+```{r function_uncertainty, dependson="add_features"}
+
+# COUNT PROPORTION OF NODES THAT STATE AS FACT A CLAIM UTTERED AS UNCERTAIN ####
+
+uncertainty_plot_fun <- function(graph) {
+  
+# Extract name of all studies ----------------------------------------------------
+  
+all.names <- graph %>%
+    activate(nodes) %>%
+    pull(name)
+  
+# Extract name of studies stating claim as fact --------------------------------
+  
+  f.names <- graph %>%
+    activate(nodes) %>%
+    data.frame() %>%
+    filter(classification == "F") %>%
+    pull(name)
+  
+  # Add names to edges -----------------------------------------------------------
+  
+  add.names.edges <- graph %>%
+    activate(edges) %>%
+    mutate(from.name = all.names[from], 
+           to.name = all.names[to])
+  
+  # Calculate, for each study stating claim as fact, the studies it cites --------
+  out.classes <- lapply(f.names, function(x) {
+    
+    out_nodes <- add.names.edges %>%
+      activate(edges) %>%
+      filter(from.name == x) %>%
+      pull(to.name)
+    
+  })
+  
+  # unlist names of studies cited by studies uttering claim as fact --------------
+  
+  di <- sort(unlist(out.classes))
+  
+  # Extract only those that do not state claim as fact ---------------------------
+  
+  nodes.no.fact <- graph %>%
+    activate(nodes) %>%
+    data.frame() %>%
+    data.table() %>%
+    .[name %in% di] %>%
+    .[!classification == "F"] %>%
+    .$name
+  
+  name.edges <- add.names.edges  %>%
+    activate(edges) %>%
+    data.frame() %>%
+    filter(from.name %in% f.names & to.name %in% nodes.no.fact) %>%
+    .[, c("from.name", "to.name")] %>%
+    c() %>%
+    unlist() %>%
+    unique(.)
+  
+  output <- add.names.edges  %>%
+    activate(nodes) %>%
+    filter(name %in% name.edges) %>%
+    activate(edges) %>%
+    filter(from.name %in% name.edges & to.name %in% name.edges)
+  
+  return(output)
+  
+}
+```
+
+```{r plot_uncertainty_facts, dependson="add_features", fig.height=3.2, fig.width=4.7}
+
+# PLOT GRAPH UNCERTAINTIES TURNED INTO FACTS ###################################
+
+out <- lapply(graph.final, function(x) uncertainty_plot_fun(x))
+
+p7 <- list()
+
+for (i in names(out)) {
+  
+  set.seed(seed)
+  
+  p7[[i]] <- ggraph(out[[i]], layout = "igraph", algorithm = "nicely") + 
+    geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
+                   end_cap = circle(1, "mm")) + 
+    geom_node_point(aes(color = category, size = degree, shape = classification)) +
+    scale_color_manual(values = c("lightgreen", "orange")) +
+    scale_shape_discrete(labels = c("Approximate", "Fact", "Lower threshold", "Range", "Upper threshold")) +
+    geom_node_text(aes(label = ifelse(degree >= min(degree.nodes[[i]]$degree), name, NA)), 
+                   repel = TRUE, size = 2.2) +
+    labs(x = "", y = "") +
+    theme_AP() + 
+    theme(axis.text.x = element_blank(), 
+          axis.ticks.x = element_blank(), 
+          axis.text.y = element_blank(), 
+          axis.ticks.y = element_blank(), 
+          legend.position = "right") 
+}
+
+p7
 ```
 
 ## Network through time
