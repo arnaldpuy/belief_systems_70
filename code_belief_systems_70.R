@@ -1,14 +1,14 @@
-## ----setup, include=FALSE-------------------------------------------------------------------------
+## ----setup, include=FALSE-------------------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE)
 
 
-## ----preliminary, warning=FALSE, message=FALSE----------------------------------------------------
+## ----preliminary, warning=FALSE, message=FALSE----------------------------------------
 
 #   PRELIMINARY FUNCTIONS ######################################################
 
 sensobol::load_packages(c("openxlsx", "data.table", "tidyverse", "bibliometrix", 
                           "igraph", "ggraph", "cowplot", "tidygraph", "benchmarkme", 
-                          "parallel", "wesanderson", "scales"))
+                          "parallel", "wesanderson", "scales", "countrycode"))
 
 # Create custom theme
 theme_AP <- function() {
@@ -31,7 +31,7 @@ theme_AP <- function() {
 }
 
 
-## ----load_and_read, warning=FALSE-----------------------------------------------------------------
+## ----load_and_read, warning=FALSE-----------------------------------------------------
 
 # CREATION OF VECTORS WITH NAMES ###############################################
 
@@ -151,7 +151,7 @@ for (i in names(final.dt)) {
 }
 
 
-## ----abstract_corpus------------------------------------------------------------------------------
+## ----abstract_corpus------------------------------------------------------------------
 
 final.dt.water.screened <- data.table(read.xlsx("final.dt.water_screened.xlsx"))
 final.dt.food.screened <- data.table(read.xlsx("final.dt.food_screened.xlsx"))
@@ -173,7 +173,7 @@ for (i in names(screened.dt)) {
 }
 
 
-## ----policy_corpus, dependson="full_text_corpus"--------------------------------------------------
+## ----policy_corpus, dependson="full_text_corpus"--------------------------------------
 
 # LOAD IN DIMENSIONS DATASETS (POLICY TEXT) ####################################
 
@@ -215,14 +215,14 @@ for (i in c("water", "food")) {
 }
 
 
-## ----full_text_corpus-----------------------------------------------------------------------------
+## ----full_text_corpus-----------------------------------------------------------------
 
 # LOAD IN DIMENSIONS DATASET (FULL TEXT) #######################################
 
 full.text.corpus.water <- fread("full.text.corpus.water.csv")
 
 
-## ----split----------------------------------------------------------------------------------------
+## ----split----------------------------------------------------------------------------
 
 # SPLIT THE DATASET INTO N FOR RESEARCH ########################################
 
@@ -276,7 +276,7 @@ for (i in 1:length(survey.dt.split)) {
 
 ## ----read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")----
 
-# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
+# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ##############################
 
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
@@ -355,7 +355,7 @@ aquastat.cites
 oldest.aquastat.cite <- min(as.integer(sub(".* (\\d{4})[a-z]?$", "\\1", 
                                            aquastat.cites$citation)), 
     na.rm = TRUE)
-  
+
 # WRITE LOOKUP TABLE TO CHECK ALREADY RETRIEVED STUDIES ########################
 
 lookup.dt <- network.dt[, .(doi, title, author, topic)] %>%
@@ -399,14 +399,8 @@ network.dt <- network.dt[, .(from, to, year, document.type, nature.claim,
 cols_to_change <- colnames(network.dt)
 network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
 
-network.dt[document.type == "NA"]
-network.dt[, .(without.citation = sum(is.na(to)), 
-               with.citation = .N - sum(is.na(to))), .(document.type, topic)] %>%
-  melt(., measure.vars = c("without.citation", "with.citation"))
 
-network.dt[is.na(document.type)]
-
-## ----descriptive_plots, dependson="read_all_datasets", fig.height=2.2, fig.width=6.5--------------
+## ----descriptive_plots, dependson="read_all_datasets", fig.height=2.2, fig.width=6.5----
 
 # PLOT DESCRIPTIVE STATISTICS ##################################################
 
@@ -449,7 +443,6 @@ b <- network.dt[, .(without.citation = sum(is.na(to)),
   facet_grid(topic~variable) + 
   theme_AP()
 
-
 # merge ------------------------------------------------------------------------
 
 plot_grid(a, b, ncol = 2, rel_widths = c(0.6, 0.4), labels = "auto")
@@ -470,7 +463,7 @@ network.dt[, .N, .(from, topic)] %>%
   labs(x = "Nº citations supporting claim \n per paper", y = "Nº papers")
 
 
-## ----network_metrics, dependson="read_all_datasets"-----------------------------------------------
+## ----network_metrics, dependson="read_all_datasets"-----------------------------------
 
 # CALCULATE NETWORK METRICS ####################################################
 
@@ -538,7 +531,7 @@ betweenness.nodes
 pagerank.nodes
 
 
-## ----add_features, dependson=c("read_all_datasets", "network_metrics")----------------------------
+## ----add_features, dependson=c("read_all_datasets", "network_metrics")----------------
 
 # ADD FEATURES TO NODES ########################################################
 
@@ -611,7 +604,7 @@ for (i in names(graph)) {
 }
 
 
-## ----calculate_proportion, dependson="add_features"-----------------------------------------------
+## ----calculate_proportion, dependson="add_features"-----------------------------------
 
 # NUMBER OF NODES ##############################################################
 
@@ -647,7 +640,7 @@ lapply(graph.final, function(graph) {
 
 
 
-## ----plot_network, dependson="add_features", fig.height=6, fig.width=7----------------------------
+## ----plot_network, dependson="add_features", fig.height=6, fig.width=7----------------
 
 # PLOT NETWORK #################################################################
 
@@ -658,7 +651,7 @@ selected_colors <- c("darkblue", "lightgreen", "orange", "red", "grey")
 
 # Label the nodes with highest degree ------------------------------------------
 
-p1 <- p2 <- p3 <- p4 <- p5 <- list()
+p1 <- p2 <- p3 <- p4 <- list()
 
 for(i in names(graph.final)) {
   
@@ -760,14 +753,95 @@ for (i in names(graph.final)) {
 p4
 
 
-for(i in names(graph.final)) {
+## ----function_uncertainty, dependson="add_features"-----------------------------------
+
+# COUNT PROPORTION OF NODES THAT STATE AS FACT A CLAIM UTTERED AS UNCERTAIN ####
+
+uncertainty_plot_fun <- function(graph) {
+  
+# Extract name of all studies ----------------------------------------------------
+  
+all.names <- graph %>%
+    activate(nodes) %>%
+    pull(name)
+  
+# Extract name of studies stating claim as fact --------------------------------
+  
+  f.names <- graph %>%
+    activate(nodes) %>%
+    data.frame() %>%
+    filter(classification == "F") %>%
+    pull(name)
+  
+  # Add names to edges -----------------------------------------------------------
+  
+  add.names.edges <- graph %>%
+    activate(edges) %>%
+    mutate(from.name = all.names[from], 
+           to.name = all.names[to])
+  
+  # Calculate, for each study stating claim as fact, the studies it cites --------
+  out.classes <- lapply(f.names, function(x) {
+    
+    out_nodes <- add.names.edges %>%
+      activate(edges) %>%
+      filter(from.name == x) %>%
+      pull(to.name)
+    
+  })
+  
+  # unlist names of studies cited by studies uttering claim as fact --------------
+  
+  di <- sort(unlist(out.classes))
+  
+  # Extract only those that do not state claim as fact ---------------------------
+  
+  nodes.no.fact <- graph %>%
+    activate(nodes) %>%
+    data.frame() %>%
+    data.table() %>%
+    .[name %in% di] %>%
+    .[!classification == "F"] %>%
+    .$name
+  
+  name.edges <- add.names.edges  %>%
+    activate(edges) %>%
+    data.frame() %>%
+    filter(from.name %in% f.names & to.name %in% nodes.no.fact) %>%
+    .[, c("from.name", "to.name")] %>%
+    c() %>%
+    unlist() %>%
+    unique(.)
+  
+  output <- add.names.edges  %>%
+    activate(nodes) %>%
+    filter(name %in% name.edges) %>%
+    activate(edges) %>%
+    filter(from.name %in% name.edges & to.name %in% name.edges)
+  
+  return(output)
+  
+}
+
+
+## ----plot_uncertainty_facts, dependson="add_features", fig.height=3.2, fig.width=4.7----
+
+# PLOT GRAPH UNCERTAINTIES TURNED INTO FACTS ###################################
+
+out <- lapply(graph.final, function(x) uncertainty_plot_fun(x))
+
+p7 <- list()
+
+for (i in names(out)) {
   
   set.seed(seed)
   
-  p5[[i]] <- ggraph(graph.final[[i]], layout = "igraph", algorithm = "nicely") + 
+  p7[[i]] <- ggraph(out[[i]], layout = "igraph", algorithm = "nicely") + 
     geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
                    end_cap = circle(1, "mm")) + 
-    geom_node_point(aes(color = classification, size = degree)) +
+    geom_node_point(aes(color = category, size = degree, shape = classification)) +
+    scale_color_manual(values = c("lightgreen", "orange")) +
+    scale_shape_discrete(labels = c("Approximate", "Fact", "Lower threshold", "Range", "Upper threshold")) +
     geom_node_text(aes(label = ifelse(degree >= min(degree.nodes[[i]]$degree), name, NA)), 
                    repel = TRUE, size = 2.2) +
     labs(x = "", y = "") +
@@ -779,14 +853,191 @@ for(i in names(graph.final)) {
           legend.position = "right") 
 }
 
-p5[[2]]
+p7
 
-graph.final[[2]] %>%
+
+## ----network_time, dependson="add_features"-------------------------------------------
+
+# PREPARE DATA TO PLOT NETWORK THROUGH TIME ####################################
+
+# Extract vector with names ----------------------------------------------------
+
+location_aquastat <- graph.final[[2]] %>%
   activate(nodes) %>%
   data.frame() %>%
-  
+  pull(name) %>%
+  grep("aquastat", .)
 
-## ----analysis_network_paths, dependson="add_features"---------------------------------------------
+# Extract vector with years ----------------------------------------------------
+
+v_years <- graph.final[[2]] %>%
+  activate(nodes) %>%
+  data.frame() %>%
+  pull(year) 
+
+# Substitute fao aquastat without year with the oldest aqustat citation --------
+
+v_years[location_aquastat] <- oldest.aquastat.cite
+
+# Find NA values ---------------------------------------------------------------
+
+na_indices <- is.na(v_years)
+sum(na_indices)
+
+# Generate random values to replace NA -----------------------------------------
+
+random_values <- sample(2000:2020, sum(na_indices), replace = TRUE)
+
+# Replace NA with random values ------------------------------------------------
+
+v_years[na_indices] <- random_values
+
+# Define the coordinates--------------------------------------------------------
+  
+y_positions <- runif(length(v_years), min = -3, max = 3)  # Random y-axis positions
+layout <- cbind(v_years, y_positions)  # Use actual years for x-axis
+layout_matrix <- as.matrix(layout)
+colnames(layout_matrix) <- c("x", "y")
+
+
+
+## ----plot_network_time, dependson="network_time"--------------------------------------
+
+# PLOT NETWORK THROUGH TIME ####################################################
+
+# Set seed ---------------------------------------------------------------------
+
+set.seed(seed)
+
+# Plot -------------------------------------------------------------------------
+
+ggraph(graph.final[[2]], layout = layout_matrix, algorithm = "nicely") +
+  geom_edge_link(arrow = arrow(length = unit(1.8, "mm")), 
+                 end_cap = circle(1, "mm"), 
+                 color = "grey", 
+                 alpha = 0.4) + 
+  geom_node_point(aes(color = nature.claim, size = degree)) +
+  geom_node_text(aes(label = ifelse(nature.claim == "modelling", name, NA)), 
+                 repel = TRUE, size = 2.5) +
+  scale_color_manual(name = "", 
+                     values = selected_colors) +
+  scale_x_continuous(name = "Year", 
+                     limits = range(v_years), 
+                     breaks = seq(min(v_years), 
+                                  max(v_years), by = 5)) +
+  labs(x = "Year", y = "") +
+  theme_AP() +
+  theme(axis.text.y = element_blank(), 
+        axis.ticks.y = element_blank()) 
+
+
+## ----network_split_years, dependson="add_features"------------------------------------
+
+# FUNCTION TO PLOT EVOLUTION OF NETWORK THROUGH TIME ###########################
+
+network_through_time_fun <- function(graph, Year, seed) {
+  
+  # Extract all names ----------------------------------------------------------
+  
+  all.names <- graph %>%
+    activate(nodes) %>%
+    pull(name)
+  
+  # Add names to edges ---------------------------------------------------------
+  
+  add.names.edges <- graph %>%
+    activate(edges) %>%
+    mutate(from.name = all.names[from], 
+           to.name = all.names[to])
+  
+  # Extract nodes by year ------------------------------------------------------
+  
+  names.targeted <- add.names.edges %>%
+    activate(edges) %>%
+    filter(year < Year) %>%
+    data.frame() %>%
+    .[, c("from.name", "to.name")] %>%
+    c() %>%
+    unlist() %>%
+    unique(.)
+  
+  name.nodes <- add.names.edges %>%
+    activate(nodes) %>%
+    filter(name %in% names.targeted) %>%
+    activate(edges) %>%
+    filter(from.name %in% names.targeted & to.name %in% names.targeted)
+  
+  set.seed(seed)
+  
+  # Plot -----------------------------------------------------------------------
+  
+  out <- ggraph(name.nodes, layout = "igraph", algorithm = "nicely") + 
+    geom_edge_link(arrow = arrow(length = unit(1, 'mm')), 
+                   end_cap = circle(0.3, "mm")) + 
+    geom_node_point(aes(color = nature.claim), size = 0.5) +
+    geom_node_text(aes(label = ifelse(nature.claim == "modelling", name, NA)), 
+                   repel = TRUE, size = 2.2) +
+    scale_color_manual(name = "", 
+                       values = selected_colors) +
+    labs(x = "", y = "") +
+    theme_AP() + 
+    theme(axis.text.x = element_blank(), 
+          axis.ticks.x = element_blank(), 
+          axis.text.y = element_blank(), 
+          axis.ticks.y = element_blank(), 
+          legend.position = "none") 
+  
+  return(out)
+  
+}
+
+# DEFINE YEARS OF INTEREST #####################################################
+
+years.vector <- c(seq(2000, 2020, 10), 2024)
+
+# RUN FUNCTION #################################################################
+
+plots.through.time <- list()
+
+for (i in names(graph.final)) {
+  
+  plots.through.time[[i]] <- lapply(years.vector, function(year)
+    network_through_time_fun(graph = graph.final[[i]], Year = year, seed = seed) + 
+      ggtitle(year))
+}
+
+
+## ----plot_network_split_years, dependson="network_split_years", fig.height=6.5--------
+
+# PLOT #########################################################################
+
+# Extract legend ---------------------------------------------------------------
+
+legend.plot <- list()
+
+for (i in names(plots.through.time)) {
+  
+  legend.plot[[i]] <- get_legend(plots.through.time[[i]][[length(plots.through.time[[i]])]] + 
+                                   theme(legend.position = "top"))
+}
+
+# Plot -------------------------------------------------------------------------
+
+bottom <- out.plot <- list()
+
+for (i in names(plots.through.time)) {
+  
+  bottom[[i]] <- do.call(plot_grid, c(plots.through.time[[i]], 
+                                      nrow = floor(length(years.vector) / 2)))
+  out.plot[[i]] <- plot_grid(legend.plot[[i]], 
+                             bottom[[i]], ncol = 1, rel_heights = c(0.1, 0.9))
+  
+}
+
+out.plot
+
+
+## ----analysis_network_paths, dependson="add_features"---------------------------------
 
 # COUNT THE NUMBER OF NODES WITH PATHS ULTIMATELY LEADING TO NODES
 # THAT DO NOT MAKE THE CITATION ################################################
@@ -816,7 +1067,7 @@ nodes_to_no_claim_node_fun <- function(g, terminal_nodes) {
 }
 
 
-## ----analysis_paths_nodes, dependson="analysis_network_paths"-------------------------------------
+## ----analysis_paths_nodes, dependson="analysis_network_paths"-------------------------
 
 # CALCULATE
 
@@ -855,7 +1106,6 @@ for(i in names(graph.final)) {
 }
 
 for(i in names(graph.final)) {
-  
   names(tmp[[i]]) <- c("path ending in no claim", 
                                "path ending in no claim or no citation")
 }
@@ -874,7 +1124,163 @@ for(i in names(tmp)) {
 out
 
 
-## ----session_information--------------------------------------------------------------------------
+## ----fun_amplification, dependson="add_features"--------------------------------------
+
+# CREATE FUNCTION TO CHECK AMPLIFICATION #######################################
+
+# amplification measure for paper P: defined as the number of 
+# citation-paths originating at P and terminating at all other papers, 
+# except for paths of length 1 flowing directly to modelling papers.
+
+amplification_fun <- function(graph) {
+  
+  # Convert tbl_graph to igraph object -----------------------------------------
+  
+  ig <- as.igraph(graph)
+  nature_claims <- V(ig)$nature.claim
+  
+  # initialize counter to store results for each paper -------------------------
+  
+  results <- numeric(vcount(ig))  
+  
+  # Loop over each paper -------------------------------------------------------
+  
+  for (P in V(ig)) {
+    
+    # Initialize counter for valid paths
+    path_count <- 0
+    
+    # Traverse through all nodes and count paths avoiding direct "modelling"
+    for (target in V(ig)) {
+      
+      if (P != target) {
+        
+        all_paths <- all_simple_paths(ig, from = P, to = target, mode = "out")
+        
+        # Filter out paths of length 1 that end in a "modelling" node
+        valid_paths <- Filter(function(path) {
+          !(length(path) == 2 && nature_claims[path[2]] == "modelling")
+        }, all_paths)
+        
+        path_count <- path_count + length(valid_paths)
+      }
+    }
+    
+    results[P] <- path_count
+  }
+  
+  return(results)
+}
+
+# RUN AMPLIFICATION FUNCTION ###################################################
+
+amplification.indices <- lapply(graph.final, function(graph) 
+  amplification_fun(graph))
+
+# Calculate average amplification index of the networks ------------------------
+# (e.g., the number paths initiated by the average paper leading to studies that do # not flow directly to "primary" data)
+lapply(amplification.indices, function(x) mean(x))
+
+
+## ----plot_amplification, dependson="fun_amplification"--------------------------------
+
+# PLOT DISTRIBUTION OF AMPLIFICATION INDIXES ###################################
+
+plot.amplification <- list()
+
+for (i in names(amplification.indices)) {
+  
+  plot.amplification[[i]] <- amplification.indices[[i]] %>%
+    data.frame("index" = .) %>%
+    ggplot(., aes(index)) +
+    geom_histogram() + 
+    theme_AP() +
+    labs(y = "Counts", x = "Amplification index") +
+    ggtitle(names(amplification.indices[i]))
+    
+}
+
+plot.amplification
+
+
+## ----aquastat_analysis----------------------------------------------------------------
+
+# STUDY OF AQUASTAT PERCENTAGES ################################################
+
+# Read in aquastat dataset -----------------------------------------------------
+
+aquastat.dt <- read.xlsx("aquastat_dt.xlsx") %>%
+  data.table() %>%
+  .[Year == 2020] %>%
+  setnames(., c("Value", "Area"), c("percentage", "country")) %>%
+  .[, .(country, percentage)] %>%
+  .[, data:= "aquastat 2020"] %>%
+  .[, country:= countrycode(country, origin = "country.name", destination = "country.name")] 
+
+aquastat.dt[, continent:= countrycode(country, origin = "country.name", destination = "continent")]
+  
+# Read in world resources institute dataset ------------------------------------
+
+wri <- fread("world_resources_institut_guide_to_the_global_environment_1994.csv") %>%
+  .[order(country)] %>%
+  .[, data:= "wri 1994"] %>%
+  .[, country:= countrycode(country, origin = "country.name", destination = "country.name")]
+
+wri[, continent:= countrycode(country, origin = "country.name", destination = "continent")]
+
+
+## ----plot_aquastat_analysis, dependson="aquastat_analysis", fig.height=1.8, fig.width=4----
+
+# Compare distributions --------------------------------------------------------
+
+dt.comparison <- rbind(aquastat.dt, wri) %>%
+  .[, data:= factor(data, levels = c("wri 1994", "aquastat 2020"))]
+
+dt.stats.comparison <- dt.comparison[, .(mean = mean(percentage, na.rm = TRUE), 
+                                         median = median(percentage, na.rm = TRUE)), data] %>%
+  melt(., measure.vars = c("mean", "median"))
+  
+  
+ggplot(dt.comparison, aes(percentage)) +
+  geom_histogram(color = "black", fill = "grey") +
+  facet_wrap(~data) +
+  geom_vline(data = dt.stats.comparison, aes(xintercept = value, color = variable)) +
+  scale_color_discrete(name = "") +
+  geom_vline(xintercept = 70, lty = 2) +
+  theme_AP()
+
+
+## ----plot_aquastat_analysis_country, dependson="aquastat_analysis", fig.width=3.5-----
+
+# At the country level ---------------------------------------------------------
+
+tmp <- aquastat.dt[wri, on = c("country", "continent")] %>%
+  .[, .(country,continent, percentage, i.percentage)] %>%
+  setnames(., c("percentage", "i.percentage"), c("aquastat 2020", "wri 1994")) %>%
+  melt(., measure.vars = c("aquastat 2020", "wri 1994")) %>%
+  .[, country:= ifelse(country == "Trinidad & Tobago", "Trinidad and Tobago", country)] %>%
+  na.omit() %>%
+  split(., .$continent)
+
+out <- list()
+
+for(i in names(tmp)) {
+  
+  out[[i]] <- ggplot(tmp[[i]], aes(reorder(country, value), 
+                                   value, color = variable)) +
+    coord_flip() +
+    scale_color_discrete(name = "") +
+    geom_point() +
+    theme_AP() +
+    theme(legend.position = "top") +
+    labs(x = "", y = "percentage") +
+    ggtitle(names(tmp[i]))
+}
+
+out
+
+
+## ----session_information--------------------------------------------------------------
 
 # SESSION INFORMATION ##########################################################
 

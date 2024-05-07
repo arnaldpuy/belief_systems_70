@@ -323,7 +323,7 @@ for (i in 1:length(survey.dt.split)) {
 
 ```{r read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")}
 
-# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
+# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ##############################
 
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
@@ -910,6 +910,60 @@ for (i in names(out)) {
 p7
 ```
 
+```{r paths_from_unc_to_facts, dependson="add_features"}
+
+# FUNCTION TO CALCULATE ALL PATHS BETWEEN PAIRS OF NODES #######################
+
+calculate_paths <- function(graph) {
+  
+  # Convert to igraph ----------------------------------------------------------
+  
+  igraph_graph <- as.igraph(graph)
+  
+  # Get all unique pairs of nodes ----------------------------------------------
+  
+  node_pairs <- expand.grid(from = V(igraph_graph), to = V(igraph_graph))
+  node_pairs <- node_pairs[node_pairs$from != node_pairs$to, ]
+  
+  # Function to calculate all simple paths between a pair of nodes--------------
+  
+  calculate_paths <- function(from, to) {
+    paths <- all_simple_paths(igraph_graph, from = from, to = to)
+    lapply(paths, names)
+  }
+  
+  # Apply the function to all node pairs and unnest the results-----------------
+  
+  all_paths <- node_pairs %>%
+    rowwise() %>%
+    mutate(paths = list(calculate_paths(from, to))) %>%
+    unnest(cols = c(paths))
+  
+  out <- sum(sapply(all_paths$paths, function(x) length(x)))
+  
+  return(out)
+
+}
+
+# CALCULATE ALL PATHS / PATHS TURNING HYPOTHESIS INTO FACTS ####################
+
+all.paths <- hypothesis.into.facts.paths <- list()
+
+for (i in names(graph.final)) {
+  
+  all.paths[[i]] <- calculate_paths(graph.final[[2]])
+  hypothesis.into.facts.paths[[i]] <- uncertainty_plot_fun(graph.final[[2]]) %>%
+    calculate_paths(.)
+ 
+}
+
+# Print results: proportion of paths turning uncertainties into facts ----------------------------------------------------------------
+
+for (i in names(all.paths)) {
+  print(hypothesis.into.facts.paths[[i]] / all.paths[[i]])
+}
+```
+
 ## Network through time
 
 ```{r network_time, dependson="add_features"}
@@ -987,7 +1041,115 @@ ggraph(graph.final[[2]], layout = layout_matrix, algorithm = "nicely") +
         axis.ticks.y = element_blank()) 
 ```
 
+```{r network_split_years, dependson="add_features"}
+
+# FUNCTION TO PLOT EVOLUTION OF NETWORK THROUGH TIME ###########################
+
+network_through_time_fun <- function(graph, Year, seed) {
+  
+  # Extract all names ----------------------------------------------------------
+  
+  all.names <- graph %>%
+    activate(nodes) %>%
+    pull(name)
+  
+  # Add names to edges ---------------------------------------------------------
+  
+  add.names.edges <- graph %>%
+    activate(edges) %>%
+    mutate(from.name = all.names[from], 
+           to.name = all.names[to])
+  
+  # Extract nodes by year ------------------------------------------------------
+  
+  names.targeted <- add.names.edges %>%
+    activate(edges) %>%
+    filter(year < Year) %>%
+    data.frame() %>%
+    .[, c("from.name", "to.name")] %>%
+    c() %>%
+    unlist() %>%
+    unique(.)
+  
+  name.nodes <- add.names.edges %>%
+    activate(nodes) %>%
+    filter(name %in% names.targeted) %>%
+    activate(edges) %>%
+    filter(from.name %in% names.targeted & to.name %in% names.targeted)
+  
+  set.seed(seed)
+  
+  # Plot -----------------------------------------------------------------------
+  
+  out <- ggraph(name.nodes, layout = "igraph", algorithm = "nicely") + 
+    geom_edge_link(arrow = arrow(length = unit(1, 'mm')), 
+                   end_cap = circle(0.3, "mm")) + 
+    geom_node_point(aes(color = nature.claim), size = 0.5) +
+    geom_node_text(aes(label = ifelse(nature.claim == "modelling", name, NA)), 
+                   repel = TRUE, size = 2.2) +
+    scale_color_manual(name = "", 
+                       values = selected_colors) +
+    labs(x = "", y = "") +
+    theme_AP() + 
+    theme(axis.text.x = element_blank(), 
+          axis.ticks.x = element_blank(), 
+          axis.text.y = element_blank(), 
+          axis.ticks.y = element_blank(), 
+          legend.position = "none") 
+  
+  return(out)
+  
+}
+
+# DEFINE YEARS OF INTEREST #####################################################
+
+years.vector <- c(seq(2000, 2020, 10), 2024)
+
+# RUN FUNCTION #################################################################
+
+plots.through.time <- list()
+
+for (i in names(graph.final)) {
+  
+  plots.through.time[[i]] <- lapply(years.vector, function(year)
+    network_through_time_fun(graph = graph.final[[i]], Year = year, seed = seed) + 
+      ggtitle(year))
+}
+```
+
+```{r plot_network_split_years, dependson="network_split_years", fig.height=6.5}
+
+# PLOT #########################################################################
+
+# Extract legend ---------------------------------------------------------------
+
+legend.plot <- list()
+
+for (i in names(plots.through.time)) {
+  
+  legend.plot[[i]] <- get_legend(plots.through.time[[i]][[length(plots.through.time[[i]])]] + 
+                                   theme(legend.position = "top"))
+}
+
+# Plot -------------------------------------------------------------------------
+
+bottom <- out.plot <- list()
+
+for (i in names(plots.through.time)) {
+  
+  bottom[[i]] <- do.call(plot_grid, c(plots.through.time[[i]], 
+                                      nrow = floor(length(years.vector) / 2)))
+  out.plot[[i]] <- plot_grid(legend.plot[[i]], 
+                             bottom[[i]], ncol = 1, rel_heights = c(0.1, 0.9))
+  
+}
+
+out.plot
+```
+
 # Analysis of paths
+
+## "no claim" or "no citation" paths
 
 ```{r analysis_network_paths, dependson="add_features"}
 
@@ -1074,6 +1236,88 @@ for(i in names(tmp)) {
 }
 
 out
+```
+
+## Calculation of amplification
+
+```{r fun_amplification, dependson="add_features"}
+
+# CREATE FUNCTION TO CHECK AMPLIFICATION #######################################
+
+# amplification measure for paper P: defined as the number of 
+# citation-paths originating at P and terminating at all other papers, 
+# except for paths of length 1 flowing directly to modelling papers.
+
+amplification_fun <- function(graph) {
+  
+  # Convert tbl_graph to igraph object -----------------------------------------
+  
+  ig <- as.igraph(graph)
+  nature_claims <- V(ig)$nature.claim
+  
+  # initialize counter to store results for each paper -------------------------
+  
+  results <- numeric(vcount(ig))  
+  
+  # Loop over each paper -------------------------------------------------------
+  
+  for (P in V(ig)) {
+    
+    # Initialize counter for valid paths
+    path_count <- 0
+    
+    # Traverse through all nodes and count paths avoiding direct "modelling"
+    for (target in V(ig)) {
+      
+      if (P != target) {
+        
+        all_paths <- all_simple_paths(ig, from = P, to = target, mode = "out")
+        
+        # Filter out paths of length 1 that end in a "modelling" node
+        valid_paths <- Filter(function(path) {
+          !(length(path) == 2 && nature_claims[path[2]] == "modelling")
+        }, all_paths)
+        
+        path_count <- path_count + length(valid_paths)
+      }
+    }
+    
+    results[P] <- path_count
+  }
+  
+  return(results)
+}
+
+# RUN AMPLIFICATION FUNCTION ###################################################
+
+amplification.indices <- lapply(graph.final, function(graph) 
+  amplification_fun(graph))
+
+# Calculate average amplification index of the networks ------------------------
+# (e.g., the number paths initiated by the average paper 
+# leading to studies that do # not flow directly to "primary" data)
+lapply(amplification.indices, function(x) mean(x))
+```
+
+```{r plot_amplification, dependson="fun_amplification"}
+
+# PLOT DISTRIBUTION OF AMPLIFICATION INDIXES ###################################
+
+plot.amplification <- list()
+
+for (i in names(amplification.indices)) {
+  
+  plot.amplification[[i]] <- amplification.indices[[i]] %>%
+    data.frame("index" = .) %>%
+    ggplot(., aes(index)) +
+    geom_histogram() + 
+    theme_AP() +
+    labs(y = "Counts", x = "Amplification index") +
+    ggtitle(names(amplification.indices[i]))
+    
+}
+
+plot.amplification
 ```
 
 # Study of Aquastat values
