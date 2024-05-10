@@ -1,8 +1,8 @@
-## ----setup, include=FALSE-------------------------------------------------------------
+## ----setup, include=FALSE---------------------------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE)
 
 
-## ----preliminary, warning=FALSE, message=FALSE----------------------------------------
+## ----preliminary, warning=FALSE, message=FALSE------------------------------------------------
 
 #   PRELIMINARY FUNCTIONS ######################################################
 
@@ -31,7 +31,7 @@ theme_AP <- function() {
 }
 
 
-## ----load_and_read, warning=FALSE-----------------------------------------------------
+## ----load_and_read, warning=FALSE-------------------------------------------------------------
 
 # CREATION OF VECTORS WITH NAMES ###############################################
 
@@ -151,7 +151,7 @@ for (i in names(final.dt)) {
 }
 
 
-## ----abstract_corpus------------------------------------------------------------------
+## ----abstract_corpus--------------------------------------------------------------------------
 
 final.dt.water.screened <- data.table(read.xlsx("final.dt.water_screened.xlsx"))
 final.dt.food.screened <- data.table(read.xlsx("final.dt.food_screened.xlsx"))
@@ -173,7 +173,7 @@ for (i in names(screened.dt)) {
 }
 
 
-## ----policy_corpus, dependson="full_text_corpus"--------------------------------------
+## ----policy_corpus, dependson="full_text_corpus"----------------------------------------------
 
 # LOAD IN DIMENSIONS DATASETS (POLICY TEXT) ####################################
 
@@ -215,14 +215,14 @@ for (i in c("water", "food")) {
 }
 
 
-## ----full_text_corpus-----------------------------------------------------------------
+## ----full_text_corpus-------------------------------------------------------------------------
 
 # LOAD IN DIMENSIONS DATASET (FULL TEXT) #######################################
 
 full.text.corpus.water <- fread("full.text.corpus.water.csv")
 
 
-## ----split----------------------------------------------------------------------------
+## ----split------------------------------------------------------------------------------------
 
 # SPLIT THE DATASET INTO N FOR RESEARCH ########################################
 
@@ -276,7 +276,7 @@ for (i in 1:length(survey.dt.split)) {
 
 ## ----read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")----
 
-# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ##############################
+# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
 
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
@@ -364,7 +364,11 @@ lookup.dt <- network.dt[, .(doi, title, author, topic)] %>%
 
 lookup.dt[, .(number.rows = nrow(.SD)), topic]
 
+# Export lookup tables ---------------------------------------------------------
+
 write.xlsx(lookup.dt, "lookup.dt.xlsx")
+write.xlsx(lookup.dt[topic == "water"], "lookup.water.dt.xlsx")
+write.xlsx(lookup.dt[topic == "food"], "lookup.food.dt.xlsx")
 
 # Remove the year from mentions to FAO Aquastat --------------------------------
 
@@ -400,7 +404,7 @@ cols_to_change <- colnames(network.dt)
 network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
 
 
-## ----descriptive_plots, dependson="read_all_datasets", fig.height=2.2, fig.width=6.5----
+## ----descriptive_plots, dependson="read_all_datasets", fig.height=2.2, fig.width=6.5----------
 
 # PLOT DESCRIPTIVE STATISTICS ##################################################
 
@@ -463,7 +467,7 @@ network.dt[, .N, .(from, topic)] %>%
   labs(x = "Nº citations supporting claim \n per paper", y = "Nº papers")
 
 
-## ----network_metrics, dependson="read_all_datasets"-----------------------------------
+## ----network_metrics, dependson="read_all_datasets"-------------------------------------------
 
 # CALCULATE NETWORK METRICS ####################################################
 
@@ -471,6 +475,9 @@ network.dt[, .N, .(from, topic)] %>%
 
 network.dt.complete <- network.dt[complete.cases(network.dt$to), ]
 split.networks <- split(network.dt.complete, network.dt.complete$topic)
+
+# Export-----
+write.xlsx(network.dt.complete, "network.dt.complete.xlsx")
 
 # Transform to graph -----------------------------------------------------------
 
@@ -531,7 +538,7 @@ betweenness.nodes
 pagerank.nodes
 
 
-## ----add_features, dependson=c("read_all_datasets", "network_metrics")----------------
+## ----add_features, dependson=c("read_all_datasets", "network_metrics")------------------------
 
 # ADD FEATURES TO NODES ########################################################
 
@@ -604,7 +611,7 @@ for (i in names(graph)) {
 }
 
 
-## ----calculate_proportion, dependson="add_features"-----------------------------------
+## ----calculate_proportion, dependson="add_features"-------------------------------------------
 
 # NUMBER OF NODES ##############################################################
 
@@ -640,7 +647,7 @@ lapply(graph.final, function(graph) {
 
 
 
-## ----plot_network, dependson="add_features", fig.height=6, fig.width=7----------------
+## ----plot_network, dependson="add_features", fig.height=6, fig.width=7------------------------
 
 # PLOT NETWORK #################################################################
 
@@ -753,7 +760,7 @@ for (i in names(graph.final)) {
 p4
 
 
-## ----function_uncertainty, dependson="add_features"-----------------------------------
+## ----function_uncertainty, dependson="add_features"-------------------------------------------
 
 # COUNT PROPORTION OF NODES THAT STATE AS FACT A CLAIM UTTERED AS UNCERTAIN ####
 
@@ -824,7 +831,7 @@ all.names <- graph %>%
 }
 
 
-## ----plot_uncertainty_facts, dependson="add_features", fig.height=3.2, fig.width=4.7----
+## ----plot_uncertainty_facts, dependson="add_features", fig.height=3.2, fig.width=4.7----------
 
 # PLOT GRAPH UNCERTAINTIES TURNED INTO FACTS ###################################
 
@@ -856,7 +863,61 @@ for (i in names(out)) {
 p7
 
 
-## ----network_time, dependson="add_features"-------------------------------------------
+## ----paths_from_unc_to_facts, dependson="add_features"----------------------------------------
+
+# FUNCTION TO CALCULATE ALL PATHS BETWEEN PAIRS OF NODES #######################
+
+calculate_paths <- function(graph) {
+  
+  # Convert to igraph ----------------------------------------------------------
+  
+  igraph_graph <- as.igraph(graph)
+  
+  # Get all unique pairs of nodes ----------------------------------------------
+  
+  node_pairs <- expand.grid(from = V(igraph_graph), to = V(igraph_graph))
+  node_pairs <- node_pairs[node_pairs$from != node_pairs$to, ]
+  
+  # Function to calculate all simple paths between a pair of nodes--------------
+  
+  calculate_paths <- function(from, to) {
+    paths <- all_simple_paths(igraph_graph, from = from, to = to)
+    lapply(paths, names)
+  }
+  
+  # Apply the function to all node pairs and unnest the results-----------------
+  
+  all_paths <- node_pairs %>%
+    rowwise() %>%
+    mutate(paths = list(calculate_paths(from, to))) %>%
+    unnest(cols = c(paths))
+  
+  out <- sum(sapply(all_paths$paths, function(x) length(x)))
+  
+  return(out)
+
+}
+
+# CALCULATE ALL PATHS / PATHS TURNING HYPOTHESIS INTO FACTS ####################
+
+all.paths <- hypothesis.into.facts.paths <- list()
+
+for (i in names(graph.final)) {
+  
+  all.paths[[i]] <- calculate_paths(graph.final[[2]])
+  hypothesis.into.facts.paths[[i]] <- uncertainty_plot_fun(graph.final[[2]]) %>%
+    calculate_paths(.)
+ 
+}
+
+# Print results: proportion of paths turning uncertainties into facts ----------------------------------------------------------------
+
+for (i in names(all.paths)) {
+  print(hypothesis.into.facts.paths[[i]] / all.paths[[i]])
+}
+
+
+## ----network_time, dependson="add_features"---------------------------------------------------
 
 # PREPARE DATA TO PLOT NETWORK THROUGH TIME ####################################
 
@@ -901,7 +962,7 @@ colnames(layout_matrix) <- c("x", "y")
 
 
 
-## ----plot_network_time, dependson="network_time"--------------------------------------
+## ----plot_network_time, dependson="network_time"----------------------------------------------
 
 # PLOT NETWORK THROUGH TIME ####################################################
 
@@ -931,7 +992,7 @@ ggraph(graph.final[[2]], layout = layout_matrix, algorithm = "nicely") +
         axis.ticks.y = element_blank()) 
 
 
-## ----network_split_years, dependson="add_features"------------------------------------
+## ----network_split_years, dependson="add_features"--------------------------------------------
 
 # FUNCTION TO PLOT EVOLUTION OF NETWORK THROUGH TIME ###########################
 
@@ -1007,7 +1068,7 @@ for (i in names(graph.final)) {
 }
 
 
-## ----plot_network_split_years, dependson="network_split_years", fig.height=6.5--------
+## ----plot_network_split_years, dependson="network_split_years", fig.height=6.5----------------
 
 # PLOT #########################################################################
 
@@ -1037,7 +1098,7 @@ for (i in names(plots.through.time)) {
 out.plot
 
 
-## ----analysis_network_paths, dependson="add_features"---------------------------------
+## ----analysis_network_paths, dependson="add_features"-----------------------------------------
 
 # COUNT THE NUMBER OF NODES WITH PATHS ULTIMATELY LEADING TO NODES
 # THAT DO NOT MAKE THE CITATION ################################################
@@ -1067,7 +1128,7 @@ nodes_to_no_claim_node_fun <- function(g, terminal_nodes) {
 }
 
 
-## ----analysis_paths_nodes, dependson="analysis_network_paths"-------------------------
+## ----analysis_paths_nodes, dependson="analysis_network_paths"---------------------------------
 
 # CALCULATE
 
@@ -1124,7 +1185,7 @@ for(i in names(tmp)) {
 out
 
 
-## ----fun_amplification, dependson="add_features"--------------------------------------
+## ----fun_amplification, dependson="add_features"----------------------------------------------
 
 # CREATE FUNCTION TO CHECK AMPLIFICATION #######################################
 
@@ -1178,11 +1239,12 @@ amplification.indices <- lapply(graph.final, function(graph)
   amplification_fun(graph))
 
 # Calculate average amplification index of the networks ------------------------
-# (e.g., the number paths initiated by the average paper leading to studies that do # not flow directly to "primary" data)
+# (e.g., the number paths initiated by the average paper 
+# leading to studies that do # not flow directly to "primary" data)
 lapply(amplification.indices, function(x) mean(x))
 
 
-## ----plot_amplification, dependson="fun_amplification"--------------------------------
+## ----plot_amplification, dependson="fun_amplification"----------------------------------------
 
 # PLOT DISTRIBUTION OF AMPLIFICATION INDIXES ###################################
 
@@ -1203,7 +1265,7 @@ for (i in names(amplification.indices)) {
 plot.amplification
 
 
-## ----aquastat_analysis----------------------------------------------------------------
+## ----aquastat_analysis------------------------------------------------------------------------
 
 # STUDY OF AQUASTAT PERCENTAGES ################################################
 
@@ -1229,7 +1291,7 @@ wri <- fread("world_resources_institut_guide_to_the_global_environment_1994.csv"
 wri[, continent:= countrycode(country, origin = "country.name", destination = "continent")]
 
 
-## ----plot_aquastat_analysis, dependson="aquastat_analysis", fig.height=1.8, fig.width=4----
+## ----plot_aquastat_analysis, dependson="aquastat_analysis", fig.height=1.8, fig.width=4-------
 
 # Compare distributions --------------------------------------------------------
 
@@ -1250,7 +1312,7 @@ ggplot(dt.comparison, aes(percentage)) +
   theme_AP()
 
 
-## ----plot_aquastat_analysis_country, dependson="aquastat_analysis", fig.width=3.5-----
+## ----plot_aquastat_analysis_country, dependson="aquastat_analysis", fig.width=3.5-------------
 
 # At the country level ---------------------------------------------------------
 
@@ -1280,7 +1342,7 @@ for(i in names(tmp)) {
 out
 
 
-## ----session_information--------------------------------------------------------------
+## ----session_information----------------------------------------------------------------------
 
 # SESSION INFORMATION ##########################################################
 

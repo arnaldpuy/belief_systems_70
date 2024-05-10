@@ -323,7 +323,7 @@ for (i in 1:length(survey.dt.split)) {
 
 ```{r read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")}
 
-# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ##############################
+# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
 
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
@@ -411,7 +411,11 @@ lookup.dt <- network.dt[, .(doi, title, author, topic)] %>%
 
 lookup.dt[, .(number.rows = nrow(.SD)), topic]
 
+# Export lookup tables ---------------------------------------------------------
+
 write.xlsx(lookup.dt, "lookup.dt.xlsx")
+write.xlsx(lookup.dt[topic == "water"], "lookup.water.dt.xlsx")
+write.xlsx(lookup.dt[topic == "food"], "lookup.food.dt.xlsx")
 
 # Remove the year from mentions to FAO Aquastat --------------------------------
 
@@ -520,6 +524,9 @@ network.dt[, .N, .(from, topic)] %>%
 
 network.dt.complete <- network.dt[complete.cases(network.dt$to), ]
 split.networks <- split(network.dt.complete, network.dt.complete$topic)
+
+# Export-----
+write.xlsx(network.dt.complete, "network.dt.complete.xlsx")
 
 # Transform to graph -----------------------------------------------------------
 
