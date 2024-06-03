@@ -323,7 +323,7 @@ for (i in 1:length(survey.dt.split)) {
 
 ```{r read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")}
 
-# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
+# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ##############################
 
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
