@@ -8,7 +8,8 @@ knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE)
 
 sensobol::load_packages(c("openxlsx", "data.table", "tidyverse", "bibliometrix", 
                           "igraph", "ggraph", "cowplot", "tidygraph", "benchmarkme", 
-                          "parallel", "wesanderson", "scales", "countrycode"))
+                          "parallel", "wesanderson", "scales", "countrycode", 
+                          "doParallel", "foreach"))
 
 # Create custom theme
 theme_AP <- function() {
@@ -359,6 +360,17 @@ oldest.aquastat.cite <- min(as.integer(sub(".* (\\d{4})[a-z]?$", "\\1",
                                            aquastat.cites$citation)), 
     na.rm = TRUE)
 
+# CHECK NUMBER OF FAOSTAT CITES ################################################
+
+faostat.cites <- network.dt[citation %like% "faostat"] %>%
+  .[, .N, .(citation, topic)] 
+
+faostat.cites
+
+oldest.faostat.cite <- min(as.integer(sub(".* (\\d{4})[a-z]?$", "\\1", 
+                                           faostat.cites$citation)), 
+                            na.rm = TRUE)
+
 # WRITE LOOKUP TABLE TO CHECK ALREADY RETRIEVED STUDIES ########################
 
 lookup.dt <- network.dt[, .(doi, title, author, topic)] %>%
@@ -373,12 +385,40 @@ write.xlsx(lookup.dt, "lookup.dt.xlsx")
 write.xlsx(lookup.dt[topic == "water"], "lookup.water.dt.xlsx")
 write.xlsx(lookup.dt[topic == "food"], "lookup.food.dt.xlsx")
 
+
+
+
+#### SEARCH FOR DUPLICATES #####################
+
+lookup.dt[topic == "water"] %>%
+  .[order(title)] %>%
+  .[duplicated(., by = "author")] %>%
+  .[order(author)] %>%
+  print(., n = Inf)
+
+lookup.dt[topic == "food"] %>%
+  .[order(title)] %>%
+  .[duplicated(., by = "author")] %>%
+  .[order(author)] %>%
+  print(., n = Inf)
+
+
+
+
 # Remove the year from mentions to FAO Aquastat --------------------------------
 
 pattern <- "\\b(?:19|20)\\d{2}\\b"  # Matches years between 1900 and 2099
 
 for (col in c("citation", "author")) {
   matches <- grepl("^fao aquastat\\s+\\d+$", network.dt[[col]], ignore.case = TRUE)
+  network.dt[matches, (col) := gsub("\\d+", "", network.dt[[col]][matches], perl = TRUE)]
+  network.dt[, (col) := trimws(network.dt[[col]])]
+}
+
+# Remove the year from mentions to FAOSTAT --------------------------------
+
+for (col in c("citation", "author")) {
+  matches <- grepl("^faostat\\s+\\d+$", network.dt[[col]], ignore.case = TRUE)
   network.dt[matches, (col) := gsub("\\d+", "", network.dt[[col]][matches], perl = TRUE)]
   network.dt[, (col) := trimws(network.dt[[col]])]
 }
@@ -528,7 +568,7 @@ network_metrics <- lapply(citation_graph, function(x)
 )
 
 # Define the max number of rows
-max.number <- 3
+max.number <- 10
 
 degree.nodes <- lapply(network_metrics, function(dt) dt[order(-degree)][1:max.number])
 degree.nodes.out <- lapply(network_metrics, function(dt) dt[order(-degree.out)][1:max.number])
@@ -540,6 +580,12 @@ degree.nodes.out
 betweenness.nodes
 pagerank.nodes
 
+
+graph.final[[1]] %>%
+  activate(nodes) %>%
+  data.frame() %>%
+  data.table() %>%
+  .[name == "faostat"]
 
 ## ----add_features, dependson=c("read_all_datasets", "network_metrics")-----------------------------------------------------
 
@@ -631,6 +677,258 @@ lapply(graph.final, function(graph) V(graph))
 
 lapply(graph.final, function(graph) ecount(graph))
 
+# CALCULATE ALL POSSIBLE PATHS #################################################
+
+# Define function --------------------------------------------------------------
+
+count_paths <- function(g) {
+  
+  # Extract the top 5 nodes with highest betweenness ---------------------------
+  
+  top_nodes <- g %>%
+    activate(nodes) %>%
+    top_n(5, betweenness) %>%
+    pull(name)
+  
+  # Initialize counts ----------------------------------------------------------
+  
+  total_paths_count <- 0
+  top_nodes_paths_count <- 0
+  
+  g <- as.igraph(g)
+  
+  results <- foreach(i = V(g), 
+                     .combine = "c", 
+                     .packages = "igraph") %:%
+    
+    foreach(j = V(g), 
+            .combine = "c") %dopar% {
+              
+              total_paths_pair <- 0
+              top_nodes_paths_pair <- 0
+              
+              if (i != j) {
+                
+                # Calculate all possible paths ---------------------------------
+                
+                paths <- all_simple_paths(g, from = i, to = j)
+                total_paths_pair <- length(paths)
+                
+                # Check how many paths pass through the top betweenness nodes --
+                
+                for (path in paths) {
+                  
+                  if (any(names(path) %in% top_nodes)) {
+                    top_nodes_paths_pair <- top_nodes_paths_pair + 1
+                    
+                  }
+                }
+              }
+              
+              # Return the count of all paths and paths through top nodes ------
+              
+              return(c(total_paths_pair, top_nodes_paths_pair))
+            }
+  
+  # Aggregate results ----------------------------------------------------------
+  
+  total_paths_count <- sum(results[seq(1, length(results), by = 2)])
+  top_nodes_paths_count <- sum(results[seq(2, length(results), by = 2)])
+  
+  return(c(total_paths_count, top_nodes_paths_count))
+  
+}
+
+
+# Define parallel computing ----------------------------------------------------
+
+cl <- makeCluster(floor(detectCores() * 0.75))
+registerDoParallel(cl)
+
+# Run the function -------------------------------------------------------------
+
+results.counts <- lapply(graph.final, function(graph) 
+  count_paths(graph))
+
+# Stop the cluster -------------------------------------------------------------
+stopCluster(cl)
+
+
+
+
+
+
+# Run the simulations ----------------------------------------------------------
+
+count_paths <- function(g) {
+  
+  # Extract the top 5 nodes with highest betweenness ---------------------------
+  
+  top_nodes <- g %>%
+    activate(nodes) %>%
+    top_n(5, betweenness) %>%
+    pull(name)
+  
+  # Initialize counts ----------------------------------------------------------
+  
+  total_paths_count <- 0
+  top_nodes_paths_count <- 0
+  
+  g <- as.igraph(g)
+  
+  results <- foreach(i = V(g), 
+                     .combine = "c", 
+                     .packages = "igraph") %:%
+    
+    foreach(j = V(g), 
+            .combine = "c") %dopar% {
+              
+              total_paths_pair <- 0
+              top_nodes_paths_pair <- 0
+              
+              if (i != j) {
+                
+                # Calculate all possible paths ---------------------------------
+                
+                paths <- all_simple_paths(g, from = i, to = j)
+                total_paths_pair <- length(paths)
+                
+                # Check how many paths pass through the top betweenness nodes --
+                
+                for (path in paths) {
+                  
+                  if (any(names(path) %in% top_nodes)) {
+                    top_nodes_paths_pair <- top_nodes_paths_pair + 1
+                    
+                  }
+                }
+              }
+              
+              # Return the count of all paths and paths through top nodes ------
+              
+              return(c(total_paths_pair, top_nodes_paths_pair))
+            }
+              
+  # Aggregate results ----------------------------------------------------------
+  
+  total_paths_count <- sum(results[seq(1, length(results), by = 2)])
+  top_nodes_paths_count <- sum(results[seq(2, length(results), by = 2)])
+              
+  return(c(total_paths_count, top_nodes_paths_count))
+
+  }
+  
+  
+
+
+  
+
+
+
+
+
+
+
+
+  
+
+# Initialize counts
+
+total_paths_count <- 0
+top_nodes_paths_count <- 0
+
+
+results <- foreach(i = V(g), 
+                   .combine = "c", 
+                   .packages = "igraph") %:%
+  
+  foreach(j = V(g), 
+          .combine = "c") %dopar% {
+            
+    total_paths_pair <- 0
+    top_nodes_paths_pair <- 0
+    
+    if (i != j) {
+      
+      # Calculate all possible paths -------------------------------------------
+      
+      paths <- all_simple_paths(g, from = i, to = j)
+      total_paths_pair <- length(paths)
+      
+      # Check how many paths pass through the top betweenness nodes ------------
+      
+      for (path in paths) {
+        
+        if (any(names(path) %in% top_nodes)) {
+          top_nodes_paths_pair <- top_nodes_paths_pair + 1
+          
+        }
+      }
+    }
+    
+    # Return the count of all paths and paths through top nodes
+    return(c(total_paths_pair, top_nodes_paths_pair))
+    
+          }
+# Aggregate results
+total_paths_count <- sum(results[seq(1, length(results), by = 2)])
+top_nodes_paths_count <- sum(results[seq(2, length(results), by = 2)])
+
+# Calculate the proportion of paths passing through top nodes
+proportion_through_top_nodes <- top_nodes_paths_count / total_paths_count
+
+
+
+
+
+# Stop the cluster
+stopCluster(cl)
+
+
+
+
+
+
+
+
+
+
+
+
+total_paths_count <- foreach(i = V(g), 
+                             .combine = "sum", 
+                             .packages = "igraph") %:%
+  
+  foreach(j = V(g), .combine = "sum") %dopar% {
+
+    paths_count <- 0
+    
+    if (i != j) {
+
+      paths <- all_simple_paths(g, from = i, to = j)
+      
+      paths_count <- length(paths)
+      
+    }
+    return(paths_count) 
+  }
+
+# Stop the parallel backend ----------------------------------------------------
+
+stopCluster(cl)
+
+
+
+
+
+
+
+
+
+
+
+
+
 # PROPORTION OF ALL PATHS THAT PASS THROUGH FIVE HIGHEST BETWEENNESS NODES ######
 
 lapply(graph.final, function(graph) {
@@ -680,7 +978,7 @@ for(i in names(graph.final)) {
                    aes(color = edge_color)) +
     scale_edge_color_manual(values = selected_colors, guide = "none") + 
     geom_node_point(aes(color = nature.claim, size = degree)) +
-    geom_node_text(aes(label = ifelse(degree >= min(degree.nodes[[i]]$degree), name, NA)), 
+    geom_node_text(aes(label = ifelse(nature.claim == "modelling", name, NA)), 
                    repel = TRUE, size = 2.2) +
     labs(x = "", y = "") +
     scale_color_manual(name = "", 
@@ -693,6 +991,31 @@ for(i in names(graph.final)) {
           legend.position = "right") 
 }
   
+p1
+
+for(i in names(graph.final)) {
+  
+  set.seed(seed)
+  
+  p1[[i]] <- ggraph(graph.final[[i]], layout = "stress") + 
+    geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
+                   end_cap = circle(1, "mm"), 
+                   aes(color = edge_color)) +
+    scale_edge_color_manual(values = selected_colors, guide = "none") + 
+    geom_node_point(aes(color = nature.claim, size = degree)) +
+    geom_node_text(aes(label = ifelse(nature.claim == "modelling", name, NA)), 
+                   repel = TRUE, size = 2.2) +
+    labs(x = "", y = "") +
+    scale_color_manual(name = "", 
+                       values = selected_colors) +
+    theme_AP() + 
+    theme(axis.text.x = element_blank(), 
+          axis.ticks.x = element_blank(), 
+          axis.text.y = element_blank(), 
+          axis.ticks.y = element_blank(), 
+          legend.position = "right") 
+}
+
 p1
 
 # Label the nodes with highest betweenness -------------------------------------
