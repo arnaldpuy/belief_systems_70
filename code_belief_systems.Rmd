@@ -59,9 +59,14 @@ theme_AP <- function() {
           plot.margin = margin(3, 4, 0, 4), 
           legend.text = element_text(size = 8), 
           axis.title = element_text(size = 10),
+          axis.text.x = element_text(size = 7),
+          axis.text.y = element_text(size = 7),
+          axis.title.x = element_text(size = 7.3),
+          axis.title.y = element_text(size = 7.3),
+          strip.text.x = element_text(size = 7.4),
           legend.key.width = unit(0.4, "cm"), 
           legend.key.height = unit(0.4, "cm"), 
-          legend.title = element_text(size = 9)) 
+          legend.title = element_text(size = 7.8)) 
 }
 ```
 
@@ -69,7 +74,7 @@ theme_AP <- function() {
 
 ```{r read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")}
 
-# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ##############################
+# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ###############################
 
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
@@ -206,8 +211,11 @@ network.dt[, category:= ifelse(!classification == "F", "Uncertain", "Fact")]
 # Create copy and remove duplicated --------------------------------------------
 
 network.dt.claim <- copy(network.dt)
-network.dt.claim <- unique(network.dt.claim, 
-                           by = c("from", "to", "document.type", "nature.claim"))
+network.dt.claim <- unique(network.dt.claim, by = c("from", "to", "document.type", 
+                                                    "nature.claim"))
+cols_to_change <- colnames(network.dt)
+network.dt.claim[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
+network.dt.claim[, (cols_to_change):= lapply(.SD, str_squish), .SDcols = (cols_to_change)]
 
 fwrite(network.dt.claim, "network.dt.claim.csv")
 
@@ -217,11 +225,12 @@ network.dt <- network.dt[, .(from, to, year, document.type, nature.claim,
                              classification, category, topic)]
 cols_to_change <- colnames(network.dt)
 network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
+network.dt[, (cols_to_change):= lapply(.SD, str_squish), .SDcols = (cols_to_change)]
 ```
 
-```{r descriptive_plots, dependson="read_all_datasets", fig.height=2.2, fig.width=6.5}
+```{r descriptive_plots, dependson="read_all_datasets", fig.height=2, fig.width=6.3, dev="pdf"}
 
-# PLOT DESCRIPTIVE STATISTICS ##################################################
+# PLOT DESCRIPTIVE STATISTICS ###################################################
 
 total.rows <- network.dt[, .(number.rows = nrow(.SD)), topic]
 
@@ -267,7 +276,7 @@ b <- network.dt[, .(without.citation = sum(is.na(to)),
 plot_grid(a, b, ncol = 2, rel_widths = c(0.6, 0.4), labels = "auto")
 ```
 
-```{r citations_support_claim, dependson="read_all_datasets", fig.height=1.6, fig.width=2.7, warning=FALSE}
+```{r citations_support_claim, dependson="read_all_datasets", fig.height=1.4, fig.width=2.5, warning=FALSE, dev="pdf"}
 
 # PLOT DISTRIBUTION OF CITATION SUPPORTING THE CLAIM ###########################
 
@@ -279,7 +288,7 @@ network.dt[, .N, .(from, topic)] %>%
   scale_x_continuous(breaks = breaks_pretty(n = 3)) +
   scale_y_continuous(breaks = breaks_pretty(n = 3)) +
   theme_AP() +
-  labs(x = "Nº citations supporting claim \n per paper", y = "Nº papers")
+  labs(x = "Nº citations to claim per paper", y = "Nº papers")
 ```
 
 ## Network metrics
@@ -448,6 +457,41 @@ lapply(graph.final, function(graph) V(graph))
 lapply(graph.final, function(graph) ecount(graph))
 
 ```
+
+```{r scale_free_plot, dependson=c("add_features", "read_all_datasets"), fig.height=1.6, fig.width=2.5, dev = "pdf"}
+
+# SCALE-FREE PLOT ##############################################################
+
+# Prepare data -----------------------------------------------------------------
+
+dt.food <- graph.final[[1]] %>%
+  activate(nodes) %>%
+  data.frame() %>%
+  data.table() %>%
+  .[, topic:= "food"]
+
+dt.water <- graph.final[[2]] %>%
+  activate(nodes) %>%
+  data.frame() %>%
+  data.table() %>%
+  .[, topic:= "water"]
+
+tmp <- rbind(dt.food, dt.water)
+
+# Calculate the degree distribution --------------------------------------------
+
+degree_distribution <- tmp[, .(P_k = .N / nrow(tmp)), .(degree, topic)]
+  
+degree_distribution %>%
+  ggplot(., aes(degree, P_k)) +
+  geom_point(size = 1) + 
+  scale_y_log10() + 
+  scale_x_log10() +
+  facet_wrap(~topic) +
+  labs(x = "Degree", y = "P(k)") +
+  theme_AP()
+```
+
 
 ```{r calculate_all_paths, dependson=c("add_features", "read_all_datasets")}
 
@@ -752,7 +796,7 @@ all.names <- graph %>%
 }
 ```
 
-```{r plot_uncertainty_facts, dependson="add_features", fig.height=3.2, fig.width=4.7}
+```{r plot_uncertainty_facts, dependson="add_features", fig.height=3.2, fig.width=4.7, dev="pdf"}
 
 # PLOT GRAPH UNCERTAINTIES TURNED INTO FACTS ###################################
 
@@ -765,7 +809,7 @@ for (i in names(out)) {
   set.seed(seed)
   
   p7[[i]] <- ggraph(out[[i]], layout = "igraph", algorithm = "nicely") + 
-    geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
+    geom_edge_link(arrow = arrow(length = unit(1.6, 'mm')), 
                    end_cap = circle(1, "mm")) + 
     geom_node_point(aes(color = category, size = degree, shape = classification)) +
     scale_color_manual(values = c("lightgreen", "orange")) +
@@ -778,11 +822,20 @@ for (i in names(out)) {
           axis.ticks.x = element_blank(), 
           axis.text.y = element_blank(), 
           axis.ticks.y = element_blank(), 
-          legend.position = "right") 
+          legend.position = "right", 
+          legend.text = element_text(size = 7.2)) 
 }
 
 p7
 ```
+
+```{r plot_uncertainty_merged, dependson="plot_uncertainty_facts", fig.width=4, fig.height=5.5, dev = "pdf"}
+
+# MERGE PLOTS ##################################################################
+
+plot_grid(p7[[1]], p7[[2]], ncol = 1, labels = "auto")
+```
+
 
 ```{r paths_from_unc_to_facts, dependson="add_features"}
 
@@ -914,7 +967,7 @@ out
 
 ```
 
-```{r plot_proportion_paths, dependson="proportion_paths", fig.height=2.4, fig.width=2.5}
+```{r plot_proportion_paths, dependson="proportion_paths", fig.height=2.4, fig.width=2.5, dev = "pdf"}
 
 # PLOT PROPORTION OF PATHS ENDING IN MODELLING, NO CLAIM AND NO CITATION #######
 
@@ -928,12 +981,7 @@ rbindlist(out, idcol = "belief") %>%
   scale_fill_manual(values = c("orange","red", "lightgreen", "grey"), 
                     name = "") + 
   theme_AP() + 
-  theme(legend.position = c(0.6, 0.9), 
-        axis.text.x = element_text(size = 7),
-        axis.text.y = element_text(size = 7),
-        axis.title.x = element_text(size = 7.3),
-        axis.title.y = element_text(size = 7.3),
-        strip.text.x = element_text(size = 7.4))
+  theme(legend.position = c(0.6, 0.9))
 ```
 
 ## Network through time
@@ -1305,9 +1353,6 @@ for(i in names(graph.final)) {
                                "path ending in no claim or no citation")
 }
 
-tmp
-
-
 # Calculate proportions --------------------------------------------------------
 
 out <- list()
@@ -1323,83 +1368,224 @@ out
 
 ```{r fun_amplification, dependson="add_features"}
 
-# CREATE FUNCTION TO CHECK AMPLIFICATION #######################################
+# CALCULATE AMPLIFICATION FUNCTION #############################################
 
-# amplification measure for paper P: defined as the number of 
-# citation-paths originating at P and terminating at all other papers, 
-# except for paths of length 1 flowing directly to modelling papers.
+# Prepare data -----------------------------------------------------------------
 
-amplification_fun <- function(graph) {
+vec.topics <- c("food", "water")
+
+graph <- modelling.papers <- list()
+
+for (i in 1:length(vec.topics)) {
   
-  # Convert tbl_graph to igraph object -----------------------------------------
+  graph[[i]] <- network.dt.complete[topic == vec.topics[[i]]] %>%
+    graph_from_data_frame(.)
   
-  ig <- as.igraph(graph)
-  nature_claims <- V(ig)$nature.claim
-  
-  # initialize counter to store results for each paper -------------------------
-  
-  results <- numeric(vcount(ig))  
-  
-  # Loop over each paper -------------------------------------------------------
-  
-  for (P in V(ig)) {
-    
-    # Initialize counter for valid paths
-    path_count <- 0
-    
-    # Traverse through all nodes and count paths avoiding direct "modelling"
-    for (target in V(ig)) {
-      
-      if (P != target) {
-        
-        all_paths <- all_simple_paths(ig, from = P, to = target, mode = "out")
-        
-        # Filter out paths of length 1 that end in a "modelling" node
-        valid_paths <- Filter(function(path) {
-          !(length(path) == 2 && nature_claims[path[2]] == "modelling")
-        }, all_paths)
-        
-        path_count <- path_count + length(valid_paths)
-      }
-    }
-    
-    results[P] <- path_count
-  }
-  
-  return(results)
+  modelling.papers[[i]] <- network.dt.complete[topic == vec.topics[[i]] & 
+                                                 nature.claim == "modelling"] %>%
+    .[, from] %>%
+    unique()
 }
 
-# RUN AMPLIFICATION FUNCTION ###################################################
+names(graph) <- vec.topics
+names(modelling.papers) <- vec.topics
 
-amplification.indices <- lapply(graph.final, function(graph) 
-  amplification_fun(graph))
+# DEFINE AMPLIFICATION FUNCTIONS ###############################################
+
+# Citation amplification function ----------------------------------------------
+
+citation_amplification_index <- function(graph, source_paper, modelling_papers) {
+  
+  # Get all simple paths from paper P ------------------------------------------
+  
+  all_paths <- all_simple_paths(graph, from = source_paper, mode = "out")
+  
+  # Filter out paths of length 1 that lead to modelling papers -----------------
+  
+  filtered_paths <- Filter(function(path) {
+
+    if (length(path) > 2) {
+      
+      return(TRUE)
+      
+    } else {
+      
+      # If length is 2, check if terminal node is modelling paper --------------
+      
+      return(!(tail(path, n = 1) %in% modelling_papers))
+    }
+  }, all_paths)
+  
+  # Calculate the number of paths ----------------------------------------------
+  
+  citation_amplification_index <- length(filtered_paths)
+  
+  return(citation_amplification_index)
+}
+
+# Function to apply previous function to all papers ----------------------------
+
+calculate_all_cai <- function(graph, modelling_papers) {
+
+  papers <- V(graph)$name
+  
+  # Initialize an empty data.table to store results ----------------------------
+  
+  result_dt <- data.table(
+    paper = character(),
+    cai = numeric()
+  )
+  
+  # Iterate over each paper ----------------------------------------------------
+  
+  for (paper in papers) {
+    
+    cai <- citation_amplification_index(graph, paper, modelling_papers)
+    result_dt <- rbind(result_dt, data.table(paper = paper, cai = cai))
+  }
+  
+  return(result_dt)
+}
+
+# CALCULATE AMPLIFICATION INDEX ################################################
 
 # Calculate average amplification index of the networks ------------------------
-# (e.g., the number paths initiated by the average paper 
+# (e.g., the number paths initiated by the average paper
 # leading to studies that do # not flow directly to "primary" data)
-lapply(amplification.indices, function(x) mean(x))
+
+out <- list()
+
+for(i in names(modelling.papers)) {
+  
+  out[[i]] <- calculate_all_cai(graph[[i]], modelling.papers[[i]])
+}
+
+# ARRANGE DATA #################################################################
+
+tmp <- rbindlist(out, idcol = "topic")
+
+# SUMMARY STATISTICS ###########################################################
+
+tmp[, mean(cai), topic]
+
+# First 5 papers amplifying the most -------------------------------------------
+
+tmp2 <- tmp[, .SD, topic] %>%
+  .[order(-cai, topic)] %>%
+  .[, head(.SD, 5), topic]
+
+tmp2
 ```
 
-```{r plot_amplification, dependson="fun_amplification"}
+```{r plot_amplification, dependson="fun_amplification", fig.height=2, fig.width=3}
 
 # PLOT DISTRIBUTION OF AMPLIFICATION INDIXES ###################################
 
 plot.amplification <- list()
 
-for (i in names(amplification.indices)) {
-  
-  plot.amplification[[i]] <- amplification.indices[[i]] %>%
-    data.frame("index" = .) %>%
-    ggplot(., aes(index)) +
-    geom_histogram() + 
-    theme_AP() +
-    labs(y = "Counts", x = "Amplification index") +
-    ggtitle(names(amplification.indices[i]))
-    
-}
+# PLOT #########################################################################
+
+plot.amplification <- ggplot(tmp, aes(cai)) +
+  geom_histogram() + 
+  facet_wrap(~topic, scales = "free") +
+  theme_AP() +
+  labs(y = "Counts", x = "Amplification index")
 
 plot.amplification
 ```
+
+```{r plot_amplification_network, dependson="fun_amplification", dev = "pdf"}
+
+# PLOT THE NETWORK OF TOP AMPLIFYING PAPERS ####################################
+
+# Define the starting nodes ----------------------------------------------------
+
+vec.names.amplification <- tmp2[, slice_max(.SD, cai, n = 1), topic] %>%
+  .[, paper]
+
+# Reorder so the top node for food comes first ---------------------------------
+
+vec.names.amplification <- vec.names.amplification[order(vec.names.amplification)]
+
+out <- list()
+
+for (i in 1:length(vec.names.amplification)) {
+  
+  start_node <- vec.names.amplification[[i]]
+  
+  # Get all simple paths from the starting node to all reachable nodes
+  paths <- all_simple_paths(graph[[i]], from = V(graph[[i]])[name == start_node])
+  
+  # Convert paths to a list of edge pairs for easy visualization
+  edge_list <- lapply(paths, function(path) {
+    edges <- as_edgelist(induced_subgraph(graph[[i]], path), names = TRUE)
+    data.frame(from = edges[, 1], to = edges[, 2])
+  })
+  
+  # Combine all path edges into a single data frame
+  path_edges <- do.call(rbind, edge_list)
+  
+  #Get the unique nodes involved in the paths
+  path_nodes <- unique(c(path_edges$from, path_edges$to))
+  
+  # Create the subgraph of all paths starting from the target node
+  subgraph <- induced_subgraph(graph[[i]], vids = V(graph[[i]])[name %in% path_nodes])
+  
+  # Convert the subgraph to a tidygraph object
+  subgraph_tbl <- as_tbl_graph(subgraph)
+  
+  # Retrieve a vector with the node names ----------------------------------------
+  
+  vec.names <- subgraph_tbl %>%
+    activate(nodes) %>%
+    pull() %>%
+    data.table(name = .)
+  
+  nature.claim.vec <- graph.final[[i]] %>%
+    activate(nodes) %>%
+    data.frame() %>%
+    data.table() %>%
+    .[name %in% vec.names$name] %>%
+    .[, nature.claim]
+  
+  subgraph_tbl <- subgraph_tbl %>%
+    activate(nodes) %>%
+    mutate(nature.claim = nature.claim.vec)
+  
+  # Plot the subgraph with ggraph
+  
+  if (i == 1) {
+    
+    selected_colors <- c("darkblue", "red")
+    
+  } else {
+  
+  selected_colors <- c("darkblue", "lightgreen", "orange", "red")
+  
+  }
+  
+  set.seed(123)
+  
+  out[[i]] <- ggraph(subgraph_tbl, layout = "igraph", algorithm = "nicely") +  
+    geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
+                   end_cap = circle(1, "mm")) +
+    geom_node_point(size = 1.5, aes(color = nature.claim)) + 
+    geom_node_text(aes(label = name), repel = TRUE, size = 2.2) + 
+    scale_color_manual(name = "", 
+                       values = selected_colors) +
+    theme_AP() +
+    labs(x = "", y = "") +
+    theme(axis.text.x = element_blank(), 
+          axis.ticks.x = element_blank(), 
+          axis.text.y = element_blank(), 
+          axis.ticks.y = element_blank(), 
+          legend.position = "right") +
+    ggtitle(paste("Paths Activated by", start_node))
+}
+
+out
+```
+
 
 # Both networks
 
@@ -1721,7 +1907,7 @@ plot_grid(a, b, ncol = 2, labels = "auto")
 
 ```{r session_information}
 
-# SESSION INFORMATION ##########################################################
+# SESSION INFORMATION ###########################################################
 
 sessionInfo()
 
