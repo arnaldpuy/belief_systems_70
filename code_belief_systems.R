@@ -429,6 +429,7 @@ dt.food <- graph.final[[1]] %>%
   activate(nodes) %>%
   data.frame() %>%
   data.table() %>%
+  .[nature.claim == "modelling"]
   .[, topic:= "food"]
 
 dt.water <- graph.final[[2]] %>%
@@ -451,6 +452,67 @@ degree_distribution %>%
   facet_wrap(~topic) +
   labs(x = "Degree", y = "P(k)") +
   theme_AP()
+
+
+
+out <- list()
+
+for (i in names(graph.final)) {
+  
+  if (i == "food") {
+    
+    selected_colors <- c("darkblue", "orange", "red", "grey")
+    
+  } else {
+    
+    selected_colors <- c("darkblue", "lightgreen", "orange", "red", "grey")
+  }
+  
+  out[[i]] <- graph.final[[i]] %>%
+    activate(nodes) %>%
+    data.frame() %>%
+    data.table() %>%
+    .[, .N, .(year, nature.claim)] %>%
+    ggplot(., aes(year, N, fill = nature.claim)) +
+    geom_area() +
+    theme_AP() + 
+    ggtitle(names(graph.final[i])) 
+  
+}
+
+out
+
+graph.final[[1]] %>%
+  activate(nodes) %>%
+  data.frame() %>%
+  data.table() %>%
+  .[, .N, .(year, nature.claim)] %>%
+  ggplot(., aes(year, N, fill = nature.claim)) +
+  geom_area() +
+  theme_AP() 
+
+graph.final[[1]] %>%
+  activate(nodes) %>%
+  data.frame() %>%
+  data.table() %>%
+  .[, .N, .(year, nature.claim)] %>%
+  print(n = Inf)
+
+legend <- get_legend(out[[2]] + theme(legend.position = "right"))
+bottom <- plot_grid(out[[1]], out[[2]])
+plot_grid(bottom, legend, rel_widths = c(0.8, 0.2), ncol = 2)
+  
+legend <- get_legend(out[[2]] + theme(legend.position = "bottom"))
+bottom <- plot_grid(out[[1]], out[[2]])
+plot_grid(bottom, legend, rel_heights= c(0.8, 0.2), ncol = 1)
+  
+
+graph.final[[2]] %>%
+  activate(nodes) %>%
+  data.frame() %>%
+  data.table() %>%
+  .[year < 1983]
+
 
 
 ## ----calculate_all_paths, dependson=c("add_features", "read_all_datasets")--------------------------
@@ -955,6 +1017,12 @@ for (i in c("water", "food")) {
   pull(name) %>%
   grep("aquastat", .)
   
+  location_faostat <- graph.final[[i]] %>%
+    activate(nodes) %>%
+    data.frame() %>%
+    pull(name) %>%
+    grep("faostat", .)
+  
   # Extract vector with years ----------------------------------------------------
   
   v_years <- graph.final[[i]] %>%
@@ -962,9 +1030,10 @@ for (i in c("water", "food")) {
   data.frame() %>%
   pull(year) 
   
-  # Substitute fao aquastat without year with the oldest aqustat citation --------
+  # Substitute fao aquastat/faostat without year with the oldest citations -----
   
   v_years[location_aquastat] <- oldest.aquastat.cite
+  v_years[location_faostat] <- oldest.faostat.cite
 
 # Find NA values ---------------------------------------------------------------
   
@@ -1851,4 +1920,15 @@ cat("Num cores:   "); print(detectCores(logical = FALSE))
 
 ## Return number of threads
 cat("Num threads: "); print(detectCores(logical = FALSE))
+
+
+
+
+
+
+
+
+
+
+
 
