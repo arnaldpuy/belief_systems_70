@@ -1,8 +1,8 @@
-## ----setup, include=FALSE---------------------------------------------------------------------------
+## ----setup, include=FALSE----------------------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE)
 
 
-## ----preliminary, warning=FALSE, message=FALSE------------------------------------------------------
+## ----preliminary, warning=FALSE, message=FALSE-------------------------------------------
 
 #   PRELIMINARY FUNCTIONS ######################################################
 
@@ -31,6 +31,7 @@ theme_AP <- function() {
           axis.title.x = element_text(size = 7.3),
           axis.title.y = element_text(size = 7.3),
           strip.text.x = element_text(size = 7.4),
+          strip.text.y = element_text(size = 7.4),
           legend.key.width = unit(0.4, "cm"), 
           legend.key.height = unit(0.4, "cm"), 
           legend.title = element_text(size = 7.8)) 
@@ -39,7 +40,7 @@ theme_AP <- function() {
 
 ## ----read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")----
 
-# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ###############################
+# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ##############################
 
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
@@ -53,40 +54,6 @@ cols_of_interest <- c("title", "author", "claim", "citation",
 combs <- expand.grid(corpus = corpus, topics = topics, approach = names.files)
 all.files <- paste(paste(paste(combs$corpus, combs$topics, sep = "."), combs$approach, sep = "_"), 
                    "xlsx", sep = ".")
-
-topics <- c("water", "food")
-
-for (i in topics) {
-  
-  nodes.tmp <- graph.final[[i]] %>%
-    activate(nodes) %>%
-    data.frame() %>%
-    data.table() 
-  
-  edges.tmp <- graph.final[[i]] %>%
-    activate(edges) %>%
-    data.frame() %>%
-    data.table() 
-  
-  write.xlsx(nodes.tmp, paste(i, ".nodes.xlsx", sep = ""))
-  write.xlsx(edges.tmp, paste(i, ".edges.xlsx", sep = ""))
-  
-}
-graph.final[[topics[i]]] %>%
-  activate(nodes) %>%
-  data.frame() %>%
-  data.table()
-
-graph.final[[1]] %>%
-  activate(edges) %>%
-  data.frame() %>%
-  data.table()
-
-for (i in topics) {
-  
-  
-}
-
 
 # READ IN DATASETS AND TURN TO LOWERCAPS #######################################
 
@@ -111,35 +78,6 @@ names(tmp) <- all.files
 sub(".*\\.([^\\.]+)_.*", "\\1", all.files)
 
 
-
-
-
-
-
-da <- data.table(read.xlsx("full.text.corpus.food_WORK.xlsx"))
-n.rows <- nrow(da)
-da[is.na(claim.in.text)] <- "F"
-da[, .N, claim.in.text] %>%
-  .[, n.rows:= n.rows] %>%
-  .[, fraction:= N / n.rows] %>%
-  print()
-
-graph.final[[1]] %>%
-  activate(nodes) %>%
-  data.frame() %>%
-  data.table() %>%
-  .[, .(min = min(year, na.rm = TRUE), max = max(year, na.rm = TRUE))]
-
-
-da <- data.table(read.xlsx("full.text.corpus.water_WORK.xlsx"))
-n.rows <- nrow(da)
-da[is.na(claim.in.text)] <- "F"
-da[, .N, claim.in.text] %>%
-  .[, n.rows:= n.rows] %>%
-  .[, fraction:= N / n.rows] %>%
-  print()
-
-
 # CLEAN AND MERGE DATASETS #####################################################
 
 # Work datasets ----------------------------------------------------------------
@@ -152,12 +90,6 @@ names(tmp.works) <- dataset.works.topics
 lapply(tmp.works, function(dt) dt[, .(doi, title, claim.in.text)]) %>%
   rbindlist(., idcol = "topic") %>%
   .[, .N, .(topic, claim.in.text)]
-
-lapply(tmp.works, function(dt) dt[, .(doi, title, claim.in.text)])
-
-
-
-
 
 # Network datasets -------------------------------------------------------------
 
@@ -262,7 +194,7 @@ network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
 network.dt[, (cols_to_change):= lapply(.SD, str_squish), .SDcols = (cols_to_change)]
 
 
-## ----descriptive_plots, dependson="read_all_datasets", fig.height=2, fig.width=6.3, dev="pdf"-------
+## ----descriptive_plots, dependson="read_all_datasets", fig.height=2, fig.width=6.3, dev="pdf"----
 
 # PLOT DESCRIPTIVE STATISTICS ###################################################
 
@@ -305,16 +237,17 @@ b <- network.dt[, .(without.citation = sum(is.na(to)),
   facet_grid(topic~variable) + 
   theme_AP()
 
-# merge ------------------------------------------------------------------------
+# merge -------------------------------------------------------------------------
 
-plot_grid(a, b, ncol = 2, rel_widths = c(0.6, 0.4), labels = "auto")
+plot.claim <- plot_grid(a, b, ncol = 2, rel_widths = c(0.6, 0.4), labels = "auto")
+plot.claim
 
 
 ## ----citations_support_claim, dependson="read_all_datasets", fig.height=1.4, fig.width=2.5, warning=FALSE, dev="pdf"----
 
 # PLOT DISTRIBUTION OF CITATION SUPPORTING THE CLAIM ###########################
 
-network.dt[, .N, .(from, topic)] %>%
+plot.supporting.claim <- network.dt[, .N, .(from, topic)] %>%
   .[order(-N)] %>%
   ggplot(., aes(N)) +
   geom_histogram() + 
@@ -324,8 +257,10 @@ network.dt[, .N, .(from, topic)] %>%
   theme_AP() +
   labs(x = "Nº citations to claim per paper", y = "Nº papers")
 
+plot.supporting.claim
 
-## ----network_metrics, dependson="read_all_datasets"-------------------------------------------------
+
+## ----network_metrics, dependson="read_all_datasets"--------------------------------------
 
 # CALCULATE NETWORK METRICS ####################################################
 
@@ -396,7 +331,7 @@ betweenness.nodes
 pagerank.nodes
 
 
-## ----add_features, dependson=c("read_all_datasets", "network_metrics")------------------------------
+## ----add_features, dependson=c("read_all_datasets", "network_metrics")-------------------
 
 # ADD FEATURES TO NODES ########################################################
 
@@ -476,7 +411,29 @@ for (i in names(graph.final)) {
 }
 
 
-## ----calculate_proportion, dependson=c("add_features", "read_all_datasets")-------------------------
+## ----export_nodes_edges, dependson="add_features"----------------------------------------
+
+# EXPORT NODES AND EDGES #######################################################
+
+for (i in topics) {
+  
+  nodes <- graph.final[[i]] %>%
+    activate(nodes) %>%
+    data.frame() %>%
+    data.table() 
+  
+  edges <- graph.final[[i]] %>%
+    activate(edges) %>%
+    data.frame() %>%
+    data.table() 
+  
+  write.xlsx(nodes, paste(i, ".nodes.xlsx", sep = ""))
+  write.xlsx(edges, paste(i, ".edges.xlsx", sep = ""))
+  
+}
+
+
+## ----calculate_proportion, dependson=c("add_features", "read_all_datasets")--------------
 
 # NUMBER OF NODES ##############################################################
 
@@ -498,7 +455,6 @@ dt.food <- graph.final[[1]] %>%
   activate(nodes) %>%
   data.frame() %>%
   data.table() %>%
-  .[nature.claim == "modelling"]
   .[, topic:= "food"]
 
 dt.water <- graph.final[[2]] %>%
@@ -513,7 +469,7 @@ tmp <- rbind(dt.food, dt.water)
 
 degree_distribution <- tmp[, .(P_k = .N / nrow(tmp)), .(degree, topic)]
   
-degree_distribution %>%
+plot.degree.distribution <- degree_distribution %>%
   ggplot(., aes(degree, P_k)) +
   geom_point(size = 1) + 
   scale_y_log10() + 
@@ -522,69 +478,20 @@ degree_distribution %>%
   labs(x = "Degree", y = "P(k)") +
   theme_AP()
 
+plot.degree.distribution
 
 
-out <- list()
+## ----merge_descriptive_plots, dependson=c("scale_free_plot", "citations_support_claim", "descriptive_plots"), fig.height=3.5, fig.width=5.7, dev = "pdf"----
 
-for (i in names(graph.final)) {
-  
-  if (i == "food") {
-    
-    selected_colors <- c("darkblue", "orange", "red", "grey")
-    
-  } else {
-    
-    selected_colors <- c("darkblue", "lightgreen", "orange", "red", "grey")
-  }
-  
-  out[[i]] <- graph.final[[i]] %>%
-    activate(nodes) %>%
-    data.frame() %>%
-    data.table() %>%
-    .[, .N, .(year, nature.claim)] %>%
-    ggplot(., aes(year, N, fill = nature.claim)) +
-    geom_area() +
-    theme_AP() + 
-    ggtitle(names(graph.final[i])) 
-  
-}
+# MERGE DESCRIPTIVE PLOTS ######################################################
 
-out
-
-graph.final[[1]] %>%
-  activate(nodes) %>%
-  data.frame() %>%
-  data.table() %>%
-  .[, .N, .(year, nature.claim)] %>%
-  ggplot(., aes(year, N, fill = nature.claim)) +
-  geom_area() +
-  theme_AP() 
-
-graph.final[[1]] %>%
-  activate(nodes) %>%
-  data.frame() %>%
-  data.table() %>%
-  .[, .N, .(year, nature.claim)] %>%
-  print(n = Inf)
-
-legend <- get_legend(out[[2]] + theme(legend.position = "right"))
-bottom <- plot_grid(out[[1]], out[[2]])
-plot_grid(bottom, legend, rel_widths = c(0.8, 0.2), ncol = 2)
-  
-legend <- get_legend(out[[2]] + theme(legend.position = "bottom"))
-bottom <- plot_grid(out[[1]], out[[2]])
-plot_grid(bottom, legend, rel_heights= c(0.8, 0.2), ncol = 1)
-  
-
-graph.final[[2]] %>%
-  activate(nodes) %>%
-  data.frame() %>%
-  data.table() %>%
-  .[year < 1983]
+bottom <- plot_grid(plot.supporting.claim, plot.degree.distribution, ncol = 2, 
+                    labels = c("c", "d"))
+plot_grid(plot.claim, bottom, ncol = 1, rel_heights = c(0.6, 0.4))
 
 
 
-## ----calculate_all_paths, dependson=c("add_features", "read_all_datasets")--------------------------
+## ----calculate_all_paths, dependson=c("add_features", "read_all_datasets")---------------
 
 # CALCULATE ALL POSSIBLE PATHS #################################################
 
@@ -663,7 +570,7 @@ results.counts <- lapply(graph.final, function(graph)
 stopCluster(cl)
 
 
-## ----results_count_paths, dependson="calculate_all_paths"-------------------------------------------
+## ----results_count_paths, dependson="calculate_all_paths"--------------------------------
 
 # SHOW TOTAL NUMBER OF PATHS AND PROPORTION OF PATHS PASSING 
 # THROUGH THE FIVE NODES WITH THE HIGHEST BETWEENNESS ##########################
@@ -814,7 +721,51 @@ for (i in names(graph.final)) {
 p4
 
 
-## ----function_uncertainty, dependson="add_features"-------------------------------------------------
+## ----plot_evolution_nature.claim, dependson="add_features", dev = "pdf", fig.height=2.2, fig.width=5----
+
+# PLOT EVOLUTION NATURE CLAIM THROUGH TIME #####################################
+
+out <- list()
+
+for (i in names(graph.final)) {
+  
+  if (i == "food") {
+    
+    # This is because in the food category there is only one modelling paper,
+    # faostat, and does not show in the geom_area plot.
+    selected_colors <- c("darkblue", "orange", "red", "grey")
+    
+  } else {
+    
+    selected_colors <- c("darkblue", "lightgreen", "orange", "red", "grey")
+  }
+  
+  
+  out[[i]] <- graph.final[[i]] %>%
+    activate(nodes) %>%
+    data.frame() %>%
+    data.table() %>%
+    .[, .N, .(year, nature.claim)] %>%
+    ggplot(., aes(year, N, fill = nature.claim)) +
+    scale_fill_manual(values = selected_colors, name = "") +
+    geom_area() +
+    scale_x_continuous(breaks = breaks_pretty(n = 3)) +
+    theme_AP() + 
+    ggtitle(names(graph.final[i])) +
+    theme(legend.position = "none", 
+          plot.title = element_text(size = 8))
+  
+}
+
+legend <- get_legend(out[[2]] + theme(legend.position = "right"))
+bottom <- plot_grid(out[[1]] + labs(x = "Year", y = "Nº studies"), 
+                    out[[2]] + labs(x = "Year", y = ""))
+plot.network.claims <- plot_grid(bottom, legend, rel_widths = c(0.75, 0.25), 
+                                 ncol = 2)
+plot.network.claims
+
+
+## ----function_uncertainty, dependson="add_features"--------------------------------------
 
 # COUNT PROPORTION OF NODES THAT STATE AS FACT A CLAIM UTTERED AS UNCERTAIN ####
 
@@ -885,7 +836,7 @@ all.names <- graph %>%
 }
 
 
-## ----plot_uncertainty_facts, dependson="add_features", fig.height=3.2, fig.width=4.7, dev="pdf"-----
+## ----plot_uncertainty_facts, dependson="add_features", fig.height=3.2, fig.width=4.7, dev="pdf"----
 
 # PLOT GRAPH UNCERTAINTIES TURNED INTO FACTS ###################################
 
@@ -925,7 +876,7 @@ p7
 plot_grid(p7[[1]], p7[[2]], ncol = 1, labels = "auto")
 
 
-## ----paths_from_unc_to_facts, dependson="add_features"----------------------------------------------
+## ----paths_from_unc_to_facts, dependson="add_features"-----------------------------------
 
 # FUNCTION TO CALCULATE ALL PATHS BETWEEN PAIRS OF NODES #######################
 
@@ -979,7 +930,7 @@ for (i in names(all.paths)) {
 }
 
 
-## ----proportion_paths, dependson="add_features"-----------------------------------------------------
+## ----proportion_paths, dependson="add_features"------------------------------------------
 
 # DEFINE FUNCTION ##############################################################
 
@@ -1058,7 +1009,6 @@ out
 # PLOT PROPORTION OF PATHS ENDING IN MODELLING, NO CLAIM AND NO CITATION #######
 
 rbindlist(out, idcol = "belief") %>%
-  .[, belief:= ifelse(belief == "food", "40\\% (food belief)", "70\\% (water belief)")] %>%
   melt(., measure.vars = colnames(.)[-1]) %>%
   ggplot(., aes(belief, value, fill = variable)) +
   geom_bar(stat = "identity", 
@@ -1070,7 +1020,7 @@ rbindlist(out, idcol = "belief") %>%
   theme(legend.position = c(0.6, 0.9))
 
 
-## ----plot_network_time, dependson="add_features", dev = "pdf"---------------------------------------
+## ----plot_network_time, dependson="add_features", dev = "pdf"----------------------------
 
 # PLOT NETWORK THROUGH TIME ####################################
 
@@ -1086,7 +1036,7 @@ for (i in c("water", "food")) {
   pull(name) %>%
   grep("aquastat", .)
   
-  location_faostat <- graph.final[[i]] %>%
+    location_faostat <- graph.final[[i]] %>%
     activate(nodes) %>%
     data.frame() %>%
     pull(name) %>%
@@ -1156,7 +1106,7 @@ plot.years[[i]] <- ggraph(graph.final[[i]], layout = layout_matrix, algorithm = 
 plot.years
 
 
-## ----network.time.sam, dependson="add_features", dev = "pdf", fig.height=6.5, fig.width=6.5---------
+## ----network.time.sam, dependson="add_features", dev = "pdf", fig.height=6.5, fig.width=6.5----
 
 # ANOTHER VISUALIZATION FOR YEARS BASED ON POLAR COORDINATES ###################
 
@@ -1209,6 +1159,10 @@ for (i in c("water", "food")) {
   
   # Plot -----------------------------------------------------------------------
   
+  # Set seed ------------------------------
+  
+  set.seed(seed)
+  
   plot.years[[i]] <- ggraph(g, layout = "manual", x = x, y = y) +
     # Add concentric circles
     geom_edge_link(arrow = arrow(length = unit(1.8, "mm")), 
@@ -1238,7 +1192,7 @@ for (i in c("water", "food")) {
 plot.years
 
 
-## ----network_split_years, dependson="add_features"--------------------------------------------------
+## ----network_split_years, dependson="add_features"---------------------------------------
 
 # FUNCTION TO PLOT EVOLUTION OF NETWORK THROUGH TIME ###########################
 
@@ -1314,7 +1268,7 @@ for (i in names(graph.final)) {
 }
 
 
-## ----plot_years_more, dependson="network_split_years", fig.height=6, fig.width=7, dev = "pdf"-------
+## ----plot_years_more, dependson="network_split_years", fig.height=6, fig.width=7, dev = "pdf"----
 
 da <- list()
 
@@ -1335,7 +1289,7 @@ for (i in names(plots.through.time)) {
 da
 
 
-## ----plot_network_split_years, dependson="network_split_years", fig.height=6.5, dev = "pdf"---------
+## ----plot_network_split_years, dependson="network_split_years", fig.height=6.5, dev = "pdf"----
 
 # PLOT #########################################################################
 
@@ -1365,7 +1319,7 @@ for (i in names(plots.through.time)) {
 out.plot
 
 
-## ----analysis_network_paths, dependson="add_features"-----------------------------------------------
+## ----analysis_network_paths, dependson="add_features"------------------------------------
 
 # COUNT THE NUMBER OF NODES WITH PATHS ULTIMATELY LEADING TO NODES
 # THAT DO NOT MAKE THE CITATION ################################################
@@ -1395,7 +1349,7 @@ nodes_to_no_claim_node_fun <- function(g, terminal_nodes) {
 }
 
 
-## ----analysis_paths_nodes, dependson="analysis_network_paths"---------------------------------------
+## ----analysis_paths_nodes, dependson="analysis_network_paths"----------------------------
 
 # CALCULATE
 
@@ -1449,7 +1403,7 @@ for(i in names(tmp)) {
 out
 
 
-## ----fun_amplification, dependson="add_features"----------------------------------------------------
+## ----fun_amplification, dependson="add_features"-----------------------------------------
 
 # CALCULATE AMPLIFICATION FUNCTION #############################################
 
@@ -1560,7 +1514,7 @@ tmp2 <- tmp[, .SD, topic] %>%
 tmp2
 
 
-## ----plot_amplification, dependson="fun_amplification", fig.height=2, fig.width=3-------------------
+## ----plot_amplification, dependson="fun_amplification", fig.height=2, fig.width=3--------
 
 # PLOT DISTRIBUTION OF AMPLIFICATION INDIXES ###################################
 
@@ -1577,7 +1531,7 @@ plot.amplification <- ggplot(tmp, aes(cai)) +
 plot.amplification
 
 
-## ----plot_amplification_network, dependson="fun_amplification", dev = "pdf"-------------------------
+## ----plot_amplification_network, dependson="fun_amplification", dev = "pdf"--------------
 
 # PLOT THE NETWORK OF TOP AMPLIFYING PAPERS ####################################
 
@@ -1639,7 +1593,7 @@ for (i in 1:length(vec.names.amplification)) {
   
   if (i == 1) {
     
-    selected_colors <- c("darkblue", "red")
+    selected_colors <- c("darkblue", "orange", "red")
     
   } else {
   
@@ -1669,7 +1623,7 @@ for (i in 1:length(vec.names.amplification)) {
 out
 
 
-## ----both_networks, dependson="network_metrics"-----------------------------------------------------
+## ----both_networks, dependson="network_metrics"------------------------------------------
 
 # CHECK FULL NETWORK AND OVERLAP BETWEEN WATER AND FOOD NETWORK ################
 
@@ -1721,7 +1675,7 @@ dt.nodes[, .N, topic.final] %>%
   print
 
 
-## ----plot_network_complete, dependson="both_networks", dev = "pdf"----------------------------------
+## ----plot_network_complete, dependson="both_networks", dev = "pdf"-----------------------
 
 # PLOT MERGED NETWORK ##########################################################
 
@@ -1744,7 +1698,7 @@ ggraph(final.graph, layout = "graphopt") +
         legend.position = "right") 
 
 
-## ----plot_shared_networks, dependson="network_metrics", dev = "pdf"---------------------------------
+## ----plot_shared_networks, dependson="network_metrics", dev = "pdf"----------------------
 
 # PLOT ONLY THE NETWORK OF NODES BEING CITED FOR BOTH BELIEFS ##################
 
@@ -1840,7 +1794,7 @@ ggraph(intersect.graph.final, layout = "graphopt") +
         legend.position = "right")
 
 
-## ----aquastat_analysis------------------------------------------------------------------------------
+## ----aquastat_analysis-------------------------------------------------------------------
 
 # STUDY OF AQUASTAT PERCENTAGES ################################################
 
@@ -1866,7 +1820,7 @@ wri <- fread("world_resources_institut_guide_to_the_global_environment_1994.csv"
 wri[, continent:= countrycode(country, origin = "country.name", destination = "continent")]
 
 
-## ----plot_aquastat_analysis, dependson="aquastat_analysis", fig.height=1.8, fig.width=4-------------
+## ----plot_aquastat_analysis, dependson="aquastat_analysis", fig.height=1.8, fig.width=4----
 
 # Compare distributions --------------------------------------------------------
 
@@ -1887,7 +1841,7 @@ ggplot(dt.comparison, aes(percentage)) +
   theme_AP()
 
 
-## ----plot_aquastat_analysis_country, dependson="aquastat_analysis", fig.width=3.5-------------------
+## ----plot_aquastat_analysis_country, dependson="aquastat_analysis", fig.width=3.5--------
 
 # At the country level ---------------------------------------------------------
 
@@ -1917,7 +1871,7 @@ for(i in names(tmp)) {
 out
 
 
-## ----aquastat_all_years, fig.height=2, fig.width=5, warning=FALSE-----------------------------------
+## ----aquastat_all_years, fig.height=2, fig.width=5, warning=FALSE------------------------
 
 # AQUASTAT ALL YEARS ############################################################
 
@@ -1975,7 +1929,7 @@ plot_grid(a, b, ncol = 2, labels = "auto")
 
 
 
-## ----session_information----------------------------------------------------------------------------
+## ----session_information-----------------------------------------------------------------
 
 # SESSION INFORMATION ###########################################################
 
@@ -1989,15 +1943,4 @@ cat("Num cores:   "); print(detectCores(logical = FALSE))
 
 ## Return number of threads
 cat("Num threads: "); print(detectCores(logical = FALSE))
-
-
-
-
-
-
-
-
-
-
-
 

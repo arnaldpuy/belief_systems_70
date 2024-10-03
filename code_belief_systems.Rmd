@@ -1,5 +1,5 @@
 ---
-title: "Irrigation's real impact on global water and food security"
+title: "The belief in irrigation as essential for food and water security"
 subtitle: "R code"
 author: "Arnald Puy"
 header-includes:
