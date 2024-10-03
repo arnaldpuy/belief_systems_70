@@ -77,6 +77,35 @@ names(tmp) <- all.files
 sub(".*\\.([^\\.]+)_.*", "\\1", all.files)
 
 
+
+
+
+
+
+da <- data.table(read.xlsx("full.text.corpus.food_WORK.xlsx"))
+n.rows <- nrow(da)
+da[is.na(claim.in.text)] <- "F"
+da[, .N, claim.in.text] %>%
+  .[, n.rows:= n.rows] %>%
+  .[, fraction:= N / n.rows] %>%
+  print()
+
+graph.final[[1]] %>%
+  activate(nodes) %>%
+  data.frame() %>%
+  data.table() %>%
+  .[, .(min = min(year, na.rm = TRUE), max = max(year, na.rm = TRUE))]
+
+
+da <- data.table(read.xlsx("full.text.corpus.water_WORK.xlsx"))
+n.rows <- nrow(da)
+da[is.na(claim.in.text)] <- "F"
+da[, .N, claim.in.text] %>%
+  .[, n.rows:= n.rows] %>%
+  .[, fraction:= N / n.rows] %>%
+  print()
+
+
 # CLEAN AND MERGE DATASETS #####################################################
 
 # Work datasets ----------------------------------------------------------------
@@ -89,6 +118,12 @@ names(tmp.works) <- dataset.works.topics
 lapply(tmp.works, function(dt) dt[, .(doi, title, claim.in.text)]) %>%
   rbindlist(., idcol = "topic") %>%
   .[, .N, .(topic, claim.in.text)]
+
+lapply(tmp.works, function(dt) dt[, .(doi, title, claim.in.text)])
+
+
+
+
 
 # Network datasets -------------------------------------------------------------
 

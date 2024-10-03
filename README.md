@@ -1,8 +1,7 @@
 
-# code_belief_systems_70
+# The belief in irrigation as essential for food and water security
 
-<!-- badges: start -->
-<!-- badges: end -->
+Arnald Puy, Seth N. Linga, Samuel Flinders, Bethan Callow, Grace Allen, Beatrice Cross, Nanxin Wei
 
-The goal of code_belief_systems_70 is to ...
-
+This study explores the origin and spread of the belief that irrigation agriculture withdraws 70% of all 
+freshwater available and 

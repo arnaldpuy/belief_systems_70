@@ -64,6 +64,7 @@ theme_AP <- function() {
           axis.title.x = element_text(size = 7.3),
           axis.title.y = element_text(size = 7.3),
           strip.text.x = element_text(size = 7.4),
+          strip.text.y = element_text(size = 7.4),
           legend.key.width = unit(0.4, "cm"), 
           legend.key.height = unit(0.4, "cm"), 
           legend.title = element_text(size = 7.8)) 
@@ -74,7 +75,7 @@ theme_AP <- function() {
 
 ```{r read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")}
 
-# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ###############################
+# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ##############################
 
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
@@ -271,16 +272,17 @@ b <- network.dt[, .(without.citation = sum(is.na(to)),
   facet_grid(topic~variable) + 
   theme_AP()
 
-# merge ------------------------------------------------------------------------
+# merge -------------------------------------------------------------------------
 
-plot_grid(a, b, ncol = 2, rel_widths = c(0.6, 0.4), labels = "auto")
+plot.claim <- plot_grid(a, b, ncol = 2, rel_widths = c(0.6, 0.4), labels = "auto")
+plot.claim
 ```
 
 ```{r citations_support_claim, dependson="read_all_datasets", fig.height=1.4, fig.width=2.5, warning=FALSE, dev="pdf"}
 
 # PLOT DISTRIBUTION OF CITATION SUPPORTING THE CLAIM ###########################
 
-network.dt[, .N, .(from, topic)] %>%
+plot.supporting.claim <- network.dt[, .N, .(from, topic)] %>%
   .[order(-N)] %>%
   ggplot(., aes(N)) +
   geom_histogram() + 
@@ -289,6 +291,8 @@ network.dt[, .N, .(from, topic)] %>%
   scale_y_continuous(breaks = breaks_pretty(n = 3)) +
   theme_AP() +
   labs(x = "Nº citations to claim per paper", y = "Nº papers")
+
+plot.supporting.claim
 ```
 
 ## Network metrics
@@ -483,7 +487,7 @@ tmp <- rbind(dt.food, dt.water)
 
 degree_distribution <- tmp[, .(P_k = .N / nrow(tmp)), .(degree, topic)]
   
-degree_distribution %>%
+plot.degree.distribution <- degree_distribution %>%
   ggplot(., aes(degree, P_k)) +
   geom_point(size = 1) + 
   scale_y_log10() + 
@@ -491,8 +495,19 @@ degree_distribution %>%
   facet_wrap(~topic) +
   labs(x = "Degree", y = "P(k)") +
   theme_AP()
+
+plot.degree.distribution
 ```
 
+```{r merge_descriptive_plots, dependson=c("scale_free_plot", "citations_support_claim", "descriptive_plots"), fig.height=3.5, fig.width=5.7, dev = "pdf"}
+
+# MERGE DESCRIPTIVE PLOTS ######################################################
+
+bottom <- plot_grid(plot.supporting.claim, plot.degree.distribution, ncol = 2, 
+                    labels = c("c", "d"))
+plot_grid(plot.claim, bottom, ncol = 1, rel_heights = c(0.6, 0.4))
+
+```
 
 ```{r calculate_all_paths, dependson=c("add_features", "read_all_datasets")}
 
@@ -763,7 +778,9 @@ for (i in names(graph.final)) {
 legend <- get_legend(out[[2]] + theme(legend.position = "right"))
 bottom <- plot_grid(out[[1]] + labs(x = "Year", y = "Nº studies"), 
                     out[[2]] + labs(x = "Year", y = ""))
-plot_grid(bottom, legend, rel_widths = c(0.75, 0.25), ncol = 2)
+plot.network.claims <- plot_grid(bottom, legend, rel_widths = c(0.75, 0.25), 
+                                 ncol = 2)
+plot.network.claims
 ```
 
 
