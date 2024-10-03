@@ -18,6 +18,24 @@ This repository contains all the data and files produced in this study.
 
 #### Primary data
 
+The 
+
+* "abstract.corpus.water_WORK.xlsx"    
+* "policy.corpus.water_WORK.xlsx"      
+* "full.text.corpus.water_WORK.xlsx"   
+
+* "abstract.corpus.water_NETWORK.xlsx"  
+* "policy.corpus.water_NETWORK.xlsx"   
+* "full.text.corpus.water_NETWORK.xlsx" 
+
+* "abstract.corpus.food_WORK.xlsx"     
+* "policy.corpus.food_WORK.xlsx"        
+* "full.text.corpus.food_WORK.xlsx"    
+
+* "abstract.corpus.food_NETWORK.xlsx"  
+* "policy.corpus.food_NETWORK.xlsx"     
+* "full.text.corpus.food_NETWORK.xlsx"
+
 ### Code
 
 We offer the code in `.R`, `.pdf` and `.Rmd`. Our entire workflow can be run and the results replicated from either of these files.
