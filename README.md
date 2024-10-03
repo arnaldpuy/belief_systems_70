@@ -44,8 +44,15 @@ claim, forming the belief network.
 
 #### Generated data
 
-The files below contain the list of nodes and edges for the water and the food belief system network 
-respectively.
+The files below contain the nodes and edges for the water and the food belief system network 
+respectively. They also include information for every node with regards to the study
+making the claim, the type of document, the nature of the claim or the strength of the claim
+(see the paper for further information about the classification).
+
+* `water.nodes.xlsx``
+* `food.nodes.xlsx`
+* `water.edges.xlsx`
+* `food.edges.xlsx`
 
 ### Code
 
