@@ -54,6 +54,40 @@ combs <- expand.grid(corpus = corpus, topics = topics, approach = names.files)
 all.files <- paste(paste(paste(combs$corpus, combs$topics, sep = "."), combs$approach, sep = "_"), 
                    "xlsx", sep = ".")
 
+topics <- c("water", "food")
+
+for (i in topics) {
+  
+  nodes.tmp <- graph.final[[i]] %>%
+    activate(nodes) %>%
+    data.frame() %>%
+    data.table() 
+  
+  edges.tmp <- graph.final[[i]] %>%
+    activate(edges) %>%
+    data.frame() %>%
+    data.table() 
+  
+  write.xlsx(nodes.tmp, paste(i, ".nodes.xlsx", sep = ""))
+  write.xlsx(edges.tmp, paste(i, ".edges.xlsx", sep = ""))
+  
+}
+graph.final[[topics[i]]] %>%
+  activate(nodes) %>%
+  data.frame() %>%
+  data.table()
+
+graph.final[[1]] %>%
+  activate(edges) %>%
+  data.frame() %>%
+  data.table()
+
+for (i in topics) {
+  
+  
+}
+
+
 # READ IN DATASETS AND TURN TO LOWERCAPS #######################################
 
 tmp <- list()

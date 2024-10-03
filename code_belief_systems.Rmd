@@ -450,6 +450,27 @@ for (i in names(graph.final)) {
 }
 ```
 
+```{r export_nodes_edges, dependson="add_features"}
+
+# EXPORT NODES AND EDGES #######################################################
+
+for (i in topics) {
+  
+  nodes <- graph.final[[i]] %>%
+    activate(nodes) %>%
+    data.frame() %>%
+    data.table() 
+  
+  edges <- graph.final[[i]] %>%
+    activate(edges) %>%
+    data.frame() %>%
+    data.table() 
+  
+  write.xlsx(nodes, paste(i, ".nodes.xlsx", sep = ""))
+  write.xlsx(edges, paste(i, ".edges.xlsx", sep = ""))
+  
+}
+```
 
 ```{r calculate_proportion, dependson=c("add_features", "read_all_datasets")}
 
@@ -1033,7 +1054,6 @@ out
 # PLOT PROPORTION OF PATHS ENDING IN MODELLING, NO CLAIM AND NO CITATION #######
 
 rbindlist(out, idcol = "belief") %>%
-  .[, belief:= ifelse(belief == "food", "40\\% (food belief)", "70\\% (water belief)")] %>%
   melt(., measure.vars = colnames(.)[-1]) %>%
   ggplot(., aes(belief, value, fill = variable)) +
   geom_bar(stat = "identity", 
@@ -1628,7 +1648,7 @@ for (i in 1:length(vec.names.amplification)) {
   
   if (i == 1) {
     
-    selected_colors <- c("darkblue", "red")
+    selected_colors <- c("darkblue", "orange", "red")
     
   } else {
   
