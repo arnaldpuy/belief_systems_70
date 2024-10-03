@@ -18,15 +18,13 @@ This repository contains all the data and files produced in this study.
 
 #### Primary data
 
-The files below are required to replicate our study. Files named with "water" contain the 
-original sample from Dimensions related to the 70% belief, while those with "food" pertain 
-to the 40% belief. Those labelled with ''abstract'', ''policy'' or ''full.text'' include
-references returned when the search queries were run in abstracts/keywords/title, in policy
-documents only or against the full text. Files ending with ''_WORK.xlsx'' contain the list 
-of all studies we surveyed searching for the targeted claim (including those returned
-by Dimensions that did not actually contained the claim), whereas the files ending with 
-''_NETWORK.xlsx'' contain the documents that have the claim or were cited as having the claim 
-and hence are part of the belief network. 
+The files below are necessary to replicate our study. Files with ''water'' relate to 
+the 70% belief and those with ''food'' to the 40% belief. Labels like ''abstract'', 
+''policy'' or ''full.text'' include references returned by dimensions after running the
+search queries in abstracts/keywords/title, in policy documents only or in the 
+full text. Files ending in ''_WORK.xlsx'' list all surveyed  studies (including 
+false positives), while ''_NETWORK.xlsx'' contains documents with or cited for the 
+claim, forming the belief network.
 
 * `abstract.corpus.water_WORK.xlsx`   
 * `policy.corpus.water_WORK.xlsx`      
@@ -43,6 +41,11 @@ and hence are part of the belief network.
 * `abstract.corpus.food_NETWORK.xlsx`  
 * `policy.corpus.food_NETWORK.xlsx`     
 * `full.text.corpus.food_NETWORK.xlsx`
+
+#### Generated data
+
+The files below contain the list of nodes and edges for the water and the food belief system network 
+respectively.
 
 ### Code
 
