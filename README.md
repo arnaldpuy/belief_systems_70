@@ -49,7 +49,7 @@ respectively. They also include information for every node with regards to the s
 making the claim, the type of document, the nature of the claim or the strength of the claim
 (see the paper for further information about the classification).
 
-* `water.nodes.xlsx``
+* `water.nodes.xlsx`
 * `food.nodes.xlsx`
 * `water.edges.xlsx`
 * `food.edges.xlsx`
