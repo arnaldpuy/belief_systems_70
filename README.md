@@ -16,7 +16,9 @@ In progress
 
 This repository contains all the data and files produced in this study.
 
+#### Primary data
+
 ### Code
 
-We offer the code in `.R`, `.pdf` and `.rmd`. Our entire workflow can be run and the results replicated from either of these files.
+We offer the code in `.R`, `.pdf` and `.Rmd`. Our entire workflow can be run and the results replicated from either of these files.
 The user must run the code from the same folder where the files are stored for a successful compilation.
