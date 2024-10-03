@@ -1932,9 +1932,11 @@ for(i in names(tmp)) {
 out
 ```
 
-```{r aquastat_all_years, fig.height=2, fig.width=5, warning=FALSE}
+```{r aquastat_all_years, fig.height=2, fig.width=5, warning=FALSE, dev="pdf"}
 
 # AQUASTAT ALL YEARS ############################################################
+
+# DATA FOR THE WATER BELIEF ####################################################
 
 # Read in dataset --------------------------------------------------------------
 
@@ -1966,27 +1968,109 @@ a <- aquastat.aww.stats %>%
   scale_color_discrete(name = "") +
   geom_hline(yintercept = 70, lty = 2) +
   theme_AP() +
-  labs(x = "Year", y = "Percentage")
+  labs(x = "Year", y = "Percentage") +
+  theme(legend.position = "none")
 
 a
 
 b <- aquastat.aww[, .(above.70 = sum(Value > 70), 
-                 below.70 = sum(Value < 70)), Year] %>%
+                      below.70 = sum(Value < 70)), Year] %>%
   melt(., measure.vars = c("above.70", "below.70")) %>%
   ggplot(., aes(Year, value, color = variable)) +
   geom_line() +
   theme_AP() +
-  scale_color_manual(name = "", labels = c("$>70$\\%", "$<70$\\%"), 
-                       values = c("blue", "orange")) +
+  scale_color_manual(name = "", labels = c(">70%", "<70%"), 
+                     values = c("blue", "orange")) +
   
-  labs(x = "Year", y = "Nº countries") 
+  labs(x = "Year", y = "Nº countries") +
+  theme(legend.position = c(0.78, 0.34))
 
 b
+
+# Fraction of estimated and imputed values -------------------------------------
+
+n.countries <- aquastat.aww[, .(total.countries = .N), Year]
+fraction.estimate <- aquastat.aww[, .N, .(Symbol, Year)] %>%
+  merge(., n.countries, by = "Year") %>%
+  .[, fraction:= N / total.countries] %>%
+  ggplot(., aes(Year, N, color = Symbol)) +
+  geom_line() +
+  labs(x = "Year", y = "Nº countries") +
+  scale_color_discrete(name = "") +
+  theme_AP() +
+  theme(legend.position = c(0.85, 0.25), 
+        legend.text = element_text(size = 7))
+
+water.plots.aquastat <- plot_grid(a, b, fraction.estimate, ncol = 3, labels = c("b", ""))
+
+# DATA FOR THE FOOD BELIEF #####################################################
+
+dt <- fread("aquastat_grain_production_irrigation.csv")
+
+# Check the variable examined --------------------------------------------------
+
+unique(dt$Variable)
+
+# Calculate mean and median ----------------------------------------------------
+
+aquastat.grain.stats <- dt[, .(mean = mean(Value), 
+                               median = median(Value), 
+                               N.countries = .N), Year] %>%
+  melt(., measure.vars = c("mean", "median"))
+
+# Calculated weighted average --------------------------------------------------
+
+dt[, weights:= Value / sum(Value), Year]
+weighted.average.dt <- dt[, .(value = sum(Value * weights), 
+                              N.countries = .N), Year] %>%
+  .[, variable:= "weighted \n average"]
+
+# Plot -------------------------------------------------------------------------
+
+a.crop <- aquastat.grain.stats %>%
+  rbind(weighted.average.dt) %>%
+  ggplot(., aes(Year, value, group = variable, color = variable)) +
+  geom_line() +
+  scale_color_discrete(name = "") +
+  geom_hline(yintercept = 40, lty = 2) +
+  theme_AP() +
+  labs(x = "", y = "Percentage") +
+  theme(legend.position = c(0.8, 0.38), 
+        legend.text = element_text(size = 7))
+
+b.crop <- dt[, .(above.40 = sum(Value > 40), 
+                 below.40 = sum(Value < 40)), Year] %>%
+  melt(., measure.vars = c("above.40", "below.40")) %>%
+  ggplot(., aes(Year, value, color = variable)) +
+  geom_line() +
+  theme_AP() +
+  scale_color_manual(name = "", labels = c(">40%", "<40%"), 
+                     values = c("blue", "orange")) +
+  
+  labs(x = "", y = "Nº countries") +
+  theme(legend.position = c(0.78, 0.34), 
+        legend.text = element_text(size = 7))
+
+n.countries.crop <- dt[, .(total.countries = .N), Year]
+fraction.estimate <- dt[, .N, .(Symbol, Year)] %>%
+  merge(., n.countries, by = "Year") %>%
+  .[, fraction:= N / total.countries] %>%
+  ggplot(., aes(Year, N, color = Symbol)) +
+  geom_line() +
+  labs(x = "", y = "Nº countries") +
+  scale_color_manual(name = "", values = c("black", "#00BFC4")) +
+  theme_AP() +
+  theme(legend.position = c(0.85, 0.25), 
+        legend.text = element_text(size = 7))
+
+crop.plots.aquastat <- plot_grid(a.crop, b.crop, fraction.estimate, labels = c("a", ""), 
+                                 ncol = 3)
+
 ```
 
-```{r aquastat_merge_years, dependson="aquastat_all_years", fig.width=5.5, fig.height=2, warning=FALSE}
+```{r aquastat_merge_years, dependson="aquastat_all_years", fig.width=5.7, fig.height=3, warning=FALSE, dev="pdf"}
 
-plot_grid(a, b, ncol = 2, labels = "auto")
+plot_grid(crop.plots.aquastat, water.plots.aquastat, ncol = 1)
 
 ```
 

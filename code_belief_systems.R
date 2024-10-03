@@ -1,8 +1,8 @@
-## ----setup, include=FALSE----------------------------------------------------------------
+## ----setup, include=FALSE---------------------------------------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE)
 
 
-## ----preliminary, warning=FALSE, message=FALSE-------------------------------------------
+## ----preliminary, warning=FALSE, message=FALSE------------------------------------------------------------
 
 #   PRELIMINARY FUNCTIONS ######################################################
 
@@ -38,7 +38,7 @@ theme_AP <- function() {
 }
 
 
-## ----read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")----
+## ----read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")------
 
 # CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ##############################
 
@@ -194,7 +194,7 @@ network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
 network.dt[, (cols_to_change):= lapply(.SD, str_squish), .SDcols = (cols_to_change)]
 
 
-## ----descriptive_plots, dependson="read_all_datasets", fig.height=2, fig.width=6.3, dev="pdf"----
+## ----descriptive_plots, dependson="read_all_datasets", fig.height=2, fig.width=6.3, dev="pdf"-------------
 
 # PLOT DESCRIPTIVE STATISTICS ###################################################
 
@@ -260,7 +260,7 @@ plot.supporting.claim <- network.dt[, .N, .(from, topic)] %>%
 plot.supporting.claim
 
 
-## ----network_metrics, dependson="read_all_datasets"--------------------------------------
+## ----network_metrics, dependson="read_all_datasets"-------------------------------------------------------
 
 # CALCULATE NETWORK METRICS ####################################################
 
@@ -331,7 +331,7 @@ betweenness.nodes
 pagerank.nodes
 
 
-## ----add_features, dependson=c("read_all_datasets", "network_metrics")-------------------
+## ----add_features, dependson=c("read_all_datasets", "network_metrics")------------------------------------
 
 # ADD FEATURES TO NODES ########################################################
 
@@ -411,7 +411,7 @@ for (i in names(graph.final)) {
 }
 
 
-## ----export_nodes_edges, dependson="add_features"----------------------------------------
+## ----export_nodes_edges, dependson="add_features"---------------------------------------------------------
 
 # EXPORT NODES AND EDGES #######################################################
 
@@ -433,7 +433,7 @@ for (i in topics) {
 }
 
 
-## ----calculate_proportion, dependson=c("add_features", "read_all_datasets")--------------
+## ----calculate_proportion, dependson=c("add_features", "read_all_datasets")-------------------------------
 
 # NUMBER OF NODES ##############################################################
 
@@ -491,7 +491,7 @@ plot_grid(plot.claim, bottom, ncol = 1, rel_heights = c(0.6, 0.4))
 
 
 
-## ----calculate_all_paths, dependson=c("add_features", "read_all_datasets")---------------
+## ----calculate_all_paths, dependson=c("add_features", "read_all_datasets")--------------------------------
 
 # CALCULATE ALL POSSIBLE PATHS #################################################
 
@@ -570,7 +570,7 @@ results.counts <- lapply(graph.final, function(graph)
 stopCluster(cl)
 
 
-## ----results_count_paths, dependson="calculate_all_paths"--------------------------------
+## ----results_count_paths, dependson="calculate_all_paths"-------------------------------------------------
 
 # SHOW TOTAL NUMBER OF PATHS AND PROPORTION OF PATHS PASSING 
 # THROUGH THE FIVE NODES WITH THE HIGHEST BETWEENNESS ##########################
@@ -721,7 +721,7 @@ for (i in names(graph.final)) {
 p4
 
 
-## ----plot_evolution_nature.claim, dependson="add_features", dev = "pdf", fig.height=2.2, fig.width=5----
+## ----plot_evolution_nature.claim, dependson="add_features", dev = "pdf", fig.height=2.2, fig.width=5------
 
 # PLOT EVOLUTION NATURE CLAIM THROUGH TIME #####################################
 
@@ -755,7 +755,7 @@ plot.network.claims <- plot_grid(bottom, legend, rel_widths = c(0.75, 0.25),
 plot.network.claims
 
 
-## ----function_uncertainty, dependson="add_features"--------------------------------------
+## ----function_uncertainty, dependson="add_features"-------------------------------------------------------
 
 # COUNT PROPORTION OF NODES THAT STATE AS FACT A CLAIM UTTERED AS UNCERTAIN ####
 
@@ -826,7 +826,7 @@ all.names <- graph %>%
 }
 
 
-## ----plot_uncertainty_facts, dependson="add_features", fig.height=3.2, fig.width=4.7, dev="pdf"----
+## ----plot_uncertainty_facts, dependson="add_features", fig.height=3.2, fig.width=4.7, dev="pdf"-----------
 
 # PLOT GRAPH UNCERTAINTIES TURNED INTO FACTS ###################################
 
@@ -866,7 +866,7 @@ p7
 plot_grid(p7[[1]], p7[[2]], ncol = 1, labels = "auto")
 
 
-## ----paths_from_unc_to_facts, dependson="add_features"-----------------------------------
+## ----paths_from_unc_to_facts, dependson="add_features"----------------------------------------------------
 
 # FUNCTION TO CALCULATE ALL PATHS BETWEEN PAIRS OF NODES #######################
 
@@ -920,7 +920,7 @@ for (i in names(all.paths)) {
 }
 
 
-## ----proportion_paths, dependson="add_features"------------------------------------------
+## ----proportion_paths, dependson="add_features"-----------------------------------------------------------
 
 # DEFINE FUNCTION ##############################################################
 
@@ -994,14 +994,14 @@ out
 
 
 
-## ----sum_no.claim_no.citation, dependson="proportion_paths"------------------------------
+## ----sum_no.claim_no.citation, dependson="proportion_paths"-----------------------------------------------
 
 # SUM PROPORTION NO CLAIM AND NO CITATION ######################################
 
 lapply(out, function(x) x[, `no citation` + `no claim`])
 
 
-## ----plot_proportion_paths, dependson="proportion_paths", fig.height=2.4, fig.width=2.5, dev = "pdf"----
+## ----plot_proportion_paths, dependson="proportion_paths", fig.height=2.4, fig.width=2.5, dev = "pdf"------
 
 # PLOT PROPORTION OF PATHS ENDING IN MODELLING, NO CLAIM AND NO CITATION #######
 
@@ -1017,7 +1017,7 @@ rbindlist(out, idcol = "belief") %>%
   theme(legend.position = c(0.6, 0.9))
 
 
-## ----plot_network_time, dependson="add_features", dev = "pdf"----------------------------
+## ----plot_network_time, dependson="add_features", dev = "pdf"---------------------------------------------
 
 # PLOT NETWORK THROUGH TIME ####################################
 
@@ -1103,7 +1103,7 @@ plot.years[[i]] <- ggraph(graph.final[[i]], layout = layout_matrix, algorithm = 
 plot.years
 
 
-## ----network.time.sam, dependson="add_features", dev = "pdf", fig.height=6.5, fig.width=6.5----
+## ----network.time.sam, dependson="add_features", dev = "pdf", fig.height=6.5, fig.width=6.5---------------
 
 # ANOTHER VISUALIZATION FOR YEARS BASED ON POLAR COORDINATES ###################
 
@@ -1189,7 +1189,7 @@ for (i in c("water", "food")) {
 plot.years
 
 
-## ----network_split_years, dependson="add_features"---------------------------------------
+## ----network_split_years, dependson="add_features"--------------------------------------------------------
 
 # FUNCTION TO PLOT EVOLUTION OF NETWORK THROUGH TIME ###########################
 
@@ -1265,7 +1265,7 @@ for (i in names(graph.final)) {
 }
 
 
-## ----plot_years_more, dependson="network_split_years", fig.height=6, fig.width=7, dev = "pdf"----
+## ----plot_years_more, dependson="network_split_years", fig.height=6, fig.width=7, dev = "pdf"-------------
 
 da <- list()
 
@@ -1286,7 +1286,7 @@ for (i in names(plots.through.time)) {
 da
 
 
-## ----plot_network_split_years, dependson="network_split_years", fig.height=6.5, dev = "pdf"----
+## ----plot_network_split_years, dependson="network_split_years", fig.height=6.5, dev = "pdf"---------------
 
 # PLOT #########################################################################
 
@@ -1316,7 +1316,7 @@ for (i in names(plots.through.time)) {
 out.plot
 
 
-## ----analysis_network_paths, dependson="add_features"------------------------------------
+## ----analysis_network_paths, dependson="add_features"-----------------------------------------------------
 
 # COUNT THE NUMBER OF NODES WITH PATHS ULTIMATELY LEADING TO NODES
 # THAT DO NOT MAKE THE CITATION ################################################
@@ -1346,7 +1346,7 @@ nodes_to_no_claim_node_fun <- function(g, terminal_nodes) {
 }
 
 
-## ----analysis_paths_nodes, dependson="analysis_network_paths"----------------------------
+## ----analysis_paths_nodes, dependson="analysis_network_paths"---------------------------------------------
 
 # CALCULATE
 
@@ -1400,7 +1400,7 @@ for(i in names(tmp)) {
 out
 
 
-## ----fun_amplification, dependson="add_features"-----------------------------------------
+## ----fun_amplification, dependson="add_features"----------------------------------------------------------
 
 # CALCULATE AMPLIFICATION FUNCTION #############################################
 
@@ -1511,7 +1511,7 @@ tmp2 <- tmp[, .SD, topic] %>%
 tmp2
 
 
-## ----plot_amplification, dependson="fun_amplification", fig.height=2, fig.width=3--------
+## ----plot_amplification, dependson="fun_amplification", fig.height=2, fig.width=3-------------------------
 
 # PLOT DISTRIBUTION OF AMPLIFICATION INDIXES ###################################
 
@@ -1528,7 +1528,7 @@ plot.amplification <- ggplot(tmp, aes(cai)) +
 plot.amplification
 
 
-## ----plot_amplification_network, dependson="fun_amplification", dev = "pdf"--------------
+## ----plot_amplification_network, dependson="fun_amplification", dev = "pdf"-------------------------------
 
 # PLOT THE NETWORK OF TOP AMPLIFYING PAPERS ####################################
 
@@ -1620,7 +1620,7 @@ for (i in 1:length(vec.names.amplification)) {
 out
 
 
-## ----both_networks, dependson="network_metrics"------------------------------------------
+## ----both_networks, dependson="network_metrics"-----------------------------------------------------------
 
 # CHECK FULL NETWORK AND OVERLAP BETWEEN WATER AND FOOD NETWORK ################
 
@@ -1672,7 +1672,7 @@ dt.nodes[, .N, topic.final] %>%
   print
 
 
-## ----plot_network_complete, dependson="both_networks", dev = "pdf"-----------------------
+## ----plot_network_complete, dependson="both_networks", dev = "pdf"----------------------------------------
 
 # PLOT MERGED NETWORK ##########################################################
 
@@ -1695,7 +1695,7 @@ ggraph(final.graph, layout = "graphopt") +
         legend.position = "right") 
 
 
-## ----plot_shared_networks, dependson="network_metrics", dev = "pdf"----------------------
+## ----plot_shared_networks, dependson="network_metrics", dev = "pdf"---------------------------------------
 
 # PLOT ONLY THE NETWORK OF NODES BEING CITED FOR BOTH BELIEFS ##################
 
@@ -1791,7 +1791,7 @@ ggraph(intersect.graph.final, layout = "graphopt") +
         legend.position = "right")
 
 
-## ----aquastat_analysis-------------------------------------------------------------------
+## ----aquastat_analysis------------------------------------------------------------------------------------
 
 # STUDY OF AQUASTAT PERCENTAGES ################################################
 
@@ -1817,7 +1817,7 @@ wri <- fread("world_resources_institut_guide_to_the_global_environment_1994.csv"
 wri[, continent:= countrycode(country, origin = "country.name", destination = "continent")]
 
 
-## ----plot_aquastat_analysis, dependson="aquastat_analysis", fig.height=1.8, fig.width=4----
+## ----plot_aquastat_analysis, dependson="aquastat_analysis", fig.height=1.8, fig.width=4-------------------
 
 # Compare distributions --------------------------------------------------------
 
@@ -1838,7 +1838,7 @@ ggplot(dt.comparison, aes(percentage)) +
   theme_AP()
 
 
-## ----plot_aquastat_analysis_country, dependson="aquastat_analysis", fig.width=3.5--------
+## ----plot_aquastat_analysis_country, dependson="aquastat_analysis", fig.width=3.5-------------------------
 
 # At the country level ---------------------------------------------------------
 
@@ -1868,9 +1868,11 @@ for(i in names(tmp)) {
 out
 
 
-## ----aquastat_all_years, fig.height=2, fig.width=5, warning=FALSE------------------------
+## ----aquastat_all_years, fig.height=2, fig.width=5, warning=FALSE, dev="pdf"------------------------------
 
 # AQUASTAT ALL YEARS ############################################################
+
+# DATA FOR THE WATER BELIEF ####################################################
 
 # Read in dataset --------------------------------------------------------------
 
@@ -1902,31 +1904,113 @@ a <- aquastat.aww.stats %>%
   scale_color_discrete(name = "") +
   geom_hline(yintercept = 70, lty = 2) +
   theme_AP() +
-  labs(x = "Year", y = "Percentage")
+  labs(x = "Year", y = "Percentage") +
+  theme(legend.position = "none")
 
 a
 
 b <- aquastat.aww[, .(above.70 = sum(Value > 70), 
-                 below.70 = sum(Value < 70)), Year] %>%
+                      below.70 = sum(Value < 70)), Year] %>%
   melt(., measure.vars = c("above.70", "below.70")) %>%
   ggplot(., aes(Year, value, color = variable)) +
   geom_line() +
   theme_AP() +
-  scale_color_manual(name = "", labels = c("$>70$\\%", "$<70$\\%"), 
-                       values = c("blue", "orange")) +
+  scale_color_manual(name = "", labels = c(">70%", "<70%"), 
+                     values = c("blue", "orange")) +
   
-  labs(x = "Year", y = "Nº countries") 
+  labs(x = "Year", y = "Nº countries") +
+  theme(legend.position = c(0.78, 0.34))
 
 b
 
+# Fraction of estimated and imputed values -------------------------------------
 
-## ----aquastat_merge_years, dependson="aquastat_all_years", fig.width=5.5, fig.height=2, warning=FALSE----
+n.countries <- aquastat.aww[, .(total.countries = .N), Year]
+fraction.estimate <- aquastat.aww[, .N, .(Symbol, Year)] %>%
+  merge(., n.countries, by = "Year") %>%
+  .[, fraction:= N / total.countries] %>%
+  ggplot(., aes(Year, N, color = Symbol)) +
+  geom_line() +
+  labs(x = "Year", y = "Nº countries") +
+  scale_color_discrete(name = "") +
+  theme_AP() +
+  theme(legend.position = c(0.85, 0.25), 
+        legend.text = element_text(size = 7))
 
-plot_grid(a, b, ncol = 2, labels = "auto")
+water.plots.aquastat <- plot_grid(a, b, fraction.estimate, ncol = 3, labels = c("b", ""))
+
+# DATA FOR THE FOOD BELIEF #####################################################
+
+dt <- fread("aquastat_grain_production_irrigation.csv")
+
+# Check the variable examined --------------------------------------------------
+
+unique(dt$Variable)
+
+# Calculate mean and median ----------------------------------------------------
+
+aquastat.grain.stats <- dt[, .(mean = mean(Value), 
+                               median = median(Value), 
+                               N.countries = .N), Year] %>%
+  melt(., measure.vars = c("mean", "median"))
+
+# Calculated weighted average --------------------------------------------------
+
+dt[, weights:= Value / sum(Value), Year]
+weighted.average.dt <- dt[, .(value = sum(Value * weights), 
+                              N.countries = .N), Year] %>%
+  .[, variable:= "weighted \n average"]
+
+# Plot -------------------------------------------------------------------------
+
+a.crop <- aquastat.grain.stats %>%
+  rbind(weighted.average.dt) %>%
+  ggplot(., aes(Year, value, group = variable, color = variable)) +
+  geom_line() +
+  scale_color_discrete(name = "") +
+  geom_hline(yintercept = 40, lty = 2) +
+  theme_AP() +
+  labs(x = "", y = "Percentage") +
+  theme(legend.position = c(0.8, 0.38), 
+        legend.text = element_text(size = 7))
+
+b.crop <- dt[, .(above.40 = sum(Value > 40), 
+                 below.40 = sum(Value < 40)), Year] %>%
+  melt(., measure.vars = c("above.40", "below.40")) %>%
+  ggplot(., aes(Year, value, color = variable)) +
+  geom_line() +
+  theme_AP() +
+  scale_color_manual(name = "", labels = c(">40%", "<40%"), 
+                     values = c("blue", "orange")) +
+  
+  labs(x = "", y = "Nº countries") +
+  theme(legend.position = c(0.78, 0.34), 
+        legend.text = element_text(size = 7))
+
+n.countries.crop <- dt[, .(total.countries = .N), Year]
+fraction.estimate <- dt[, .N, .(Symbol, Year)] %>%
+  merge(., n.countries, by = "Year") %>%
+  .[, fraction:= N / total.countries] %>%
+  ggplot(., aes(Year, N, color = Symbol)) +
+  geom_line() +
+  labs(x = "", y = "Nº countries") +
+  scale_color_manual(name = "", values = c("black", "#00BFC4")) +
+  theme_AP() +
+  theme(legend.position = c(0.85, 0.25), 
+        legend.text = element_text(size = 7))
+
+crop.plots.aquastat <- plot_grid(a.crop, b.crop, fraction.estimate, labels = c("a", ""), 
+                                 ncol = 3)
 
 
 
-## ----session_information-----------------------------------------------------------------
+## ----aquastat_merge_years, dependson="aquastat_all_years", fig.width=5.7, fig.height=3, warning=FALSE, dev="pdf"----
+
+plot_grid(crop.plots.aquastat, water.plots.aquastat, ncol = 1)
+
+
+
+## ----session_information----------------------------------------------------------------------------------
 
 # SESSION INFORMATION ###########################################################
 
