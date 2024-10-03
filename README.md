@@ -4,12 +4,18 @@
 
 [Arnald Puy](https://www.arnaldpuy.com/), Seth N. Linga, Samuel Flinders, Bethan Callow, Grace Allen, Beatrice Cross, Nanxin Wei
 
-This study examines the origin, spread and empirical foundations of the belief that irrigation agriculture withdraws 70% of all 
-freshwater available and produces 40% of all crops consumed worldwide.
+This study examines the origin, spread and empirical foundations of the belief that 
+irrigation agriculture withdraws 70% of all freshwater available and produces 40% 
+of all crops consumed worldwide.
 
 ## Abstract
 
-In progress
+*A key tenet in sustainability science is that irrigation agriculture is crucial 
+to food and water security because it produces 40% of all crops consumed worldwide 
+and withdraws 70\% of all freshwater resources. Here we show that these claims have 
+mainly spread through the literature by unwarranted amplification, with 60-85\% 
+of all citation paths ending in papers that did not provide primary data or that 
+did not actually make the claims.*
 
 ## Replication
 

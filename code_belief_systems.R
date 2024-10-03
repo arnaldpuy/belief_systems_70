@@ -728,18 +728,8 @@ p4
 out <- list()
 
 for (i in names(graph.final)) {
-  
-  if (i == "food") {
-    
-    # This is because in the food category there is only one modelling paper,
-    # faostat, and does not show in the geom_area plot.
-    selected_colors <- c("darkblue", "orange", "red", "grey")
-    
-  } else {
-    
+ 
     selected_colors <- c("darkblue", "lightgreen", "orange", "red", "grey")
-  }
-  
   
   out[[i]] <- graph.final[[i]] %>%
     activate(nodes) %>%
@@ -1002,6 +992,13 @@ proportion_paths <- function(graph) {
 out <- lapply(graph.final, function(graph) proportion_paths(graph))
 out
 
+
+
+## ----sum_no.claim_no.citation, dependson="proportion_paths"------------------------------
+
+# SUM PROPORTION NO CLAIM AND NO CITATION ######################################
+
+lapply(out, function(x) x[, `no citation` + `no claim`])
 
 
 ## ----plot_proportion_paths, dependson="proportion_paths", fig.height=2.4, fig.width=2.5, dev = "pdf"----
