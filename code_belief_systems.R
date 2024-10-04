@@ -1876,15 +1876,7 @@ out
 
 # Read in dataset --------------------------------------------------------------
 
-aquastat <- read.xlsx("AQUASTAT_Dissemination_System.xlsx") %>%
-  data.table() %>%
-  .[, Country:= countrycode(Area, origin = "country.name", destination = "country.name")] %>%
-  .[!is.na(Country)] %>%
-  .[, .(Country, Year, Variable, Value, Unit, Symbol)] 
-
-name.variables <- unique(aquastat$Variable)
-
-aquastat.aww <- aquastat[Variable == name.variables[3]] 
+aquastat.aww <- fread("aquastat.fraction.agriculture.withdrawals.csv")
 aquastat.aww.stats <- aquastat.aww[, .(mean = mean(Value, na.rm = TRUE), 
                                        median = median(Value, na.rm = TRUE)), Year] %>%
   melt(., measure.vars = c("mean", "median"))
@@ -1937,11 +1929,25 @@ fraction.estimate <- aquastat.aww[, .N, .(Symbol, Year)] %>%
   theme(legend.position = c(0.85, 0.25), 
         legend.text = element_text(size = 7))
 
-water.plots.aquastat <- plot_grid(a, b, fraction.estimate, ncol = 3, labels = c("b", ""))
+dt.stats.year <- aquastat.aww.stats %>%
+  rbind(weighted.average.dt) %>%
+  .[Year == max(Year)]
+
+water.histogram <- aquastat.aww[Year == max(Year)] %>%
+  ggplot(., aes(Value)) +
+  geom_histogram(color = "black", fill = "grey") +
+  geom_vline(xintercept = 70, lty = 2) +
+  geom_vline(data = dt.stats.year, aes(xintercept = value, color = variable)) +
+  labs(x = "Percentage", y = "Counts") + 
+  theme_AP() + 
+  theme(legend.position = "none")
+
+water.plots.aquastat <- plot_grid(a, water.histogram, b, fraction.estimate, 
+                                  ncol = 4, labels = c("b", ""))
 
 # DATA FOR THE FOOD BELIEF #####################################################
 
-dt <- fread("aquastat_grain_production_irrigation.csv")
+dt <- fread("aquastat.fraction.grain.irrigated.csv")
 
 # Check the variable examined --------------------------------------------------
 
@@ -1974,6 +1980,8 @@ a.crop <- aquastat.grain.stats %>%
   theme(legend.position = c(0.8, 0.38), 
         legend.text = element_text(size = 7))
 
+a.crop
+
 b.crop <- dt[, .(above.40 = sum(Value > 40), 
                  below.40 = sum(Value < 40)), Year] %>%
   melt(., measure.vars = c("above.40", "below.40")) %>%
@@ -1987,6 +1995,8 @@ b.crop <- dt[, .(above.40 = sum(Value > 40),
   theme(legend.position = c(0.78, 0.34), 
         legend.text = element_text(size = 7))
 
+b.crop
+
 n.countries.crop <- dt[, .(total.countries = .N), Year]
 fraction.estimate <- dt[, .N, .(Symbol, Year)] %>%
   merge(., n.countries, by = "Year") %>%
@@ -1999,9 +2009,25 @@ fraction.estimate <- dt[, .N, .(Symbol, Year)] %>%
   theme(legend.position = c(0.85, 0.25), 
         legend.text = element_text(size = 7))
 
-crop.plots.aquastat <- plot_grid(a.crop, b.crop, fraction.estimate, labels = c("a", ""), 
-                                 ncol = 3)
+fraction.estimate
 
+dt.stats.year.crops <- aquastat.grain.stats %>%
+  rbind(weighted.average.dt) %>%
+  .[Year == max(Year)] 
+
+crop.histogram <- dt[Year == max(Year)] %>%
+  ggplot(., aes(Value)) +
+  geom_histogram() +
+  geom_vline(xintercept = 40, lty = 2) +
+  geom_vline(data = dt.stats.year.crops, aes(xintercept = value, color = variable)) +
+  labs(x = "Percentage", y = "Counts") + 
+  theme_AP() +
+  theme(legend.position = "none")
+
+crop.histogram
+
+crop.plots.aquastat <- plot_grid(a.crop, crop.histogram, b.crop, fraction.estimate, 
+                                 labels = c("a", ""), ncol = 4)
 
 
 ## ----aquastat_merge_years, dependson="aquastat_all_years", fig.width=5.7, fig.height=3, warning=FALSE, dev="pdf"----
@@ -2012,16 +2038,19 @@ plot_grid(crop.plots.aquastat, water.plots.aquastat, ncol = 1)
 
 ## ----session_information----------------------------------------------------------------------------------
 
-# SESSION INFORMATION ###########################################################
+# SESSION INFORMATION ##########################################################
 
 sessionInfo()
 
-## Return the machine CPU
+## Return the machine CPU ------------------------------------------------------
+
 cat("Machine:     "); print(get_cpu()$model_name)
 
-## Return number of true cores
+## Return number of true cores -------------------------------------------------
+
 cat("Num cores:   "); print(detectCores(logical = FALSE))
 
-## Return number of threads
+## Return number of threads ----------------------------------------------------
+
 cat("Num threads: "); print(detectCores(logical = FALSE))
 

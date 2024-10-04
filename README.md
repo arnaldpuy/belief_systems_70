@@ -27,7 +27,7 @@ This repository contains all the data and files produced in this study.
 
 The files below are necessary to replicate our study. Files with ''water'' relate to 
 the 70% belief and those with ''food'' to the 40% belief. Labels like ''abstract'', 
-''policy'' or ''full.text'' include references returned by dimensions after running the
+''policy'' or ''full.text'' include references returned by Dimensions after running the
 search queries in abstracts/keywords/title, in policy documents only or in the 
 full text. Files ending in ''_WORK.xlsx'' list all surveyed  studies (including 
 false positives), while ''_NETWORK.xlsx'' contains documents with or cited for the 
@@ -49,6 +49,13 @@ claim, forming the belief network.
 * `policy.corpus.food_NETWORK.xlsx`     
 * `full.text.corpus.food_NETWORK.xlsx`
 
+We also enclose in `.csv` the [Aquastat](https://data.apps.fao.org/aquastat/?lang=en) data on the percentage of freshwater withdrawn 
+by agriculture and the percentage of grain irrigated at the country level, which 
+are discussed and analyzed in the manuscript.
+
+* `aquastat.fraction.grain.irrigated.csv`
+* `aquastat.fraction.agriculture.withdrawals.csv`
+
 #### Generated data
 
 The files below contain the nodes and edges for the water and the food belief system network 
@@ -63,5 +70,7 @@ making the claim, the type of document, the nature of the claim or the strength 
 
 ### Code
 
-We offer the code in `.R`, `.pdf` and `.Rmd`. Our entire workflow can be run and the results replicated from either of these files.
-The user must run the code from the same folder where the files in the primary data section are stored for a successful compilation.
+We offer the code in `.R`, `.pdf` and `.Rmd`. Our entire workflow can be run and the 
+results replicated from either of these files. The user must run the code from the 
+same folder where the files in the primary data section are stored for a successful 
+compilation.
