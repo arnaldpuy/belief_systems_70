@@ -42,7 +42,7 @@ knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE)
 sensobol::load_packages(c("openxlsx", "data.table", "tidyverse", "bibliometrix", 
                           "igraph", "ggraph", "cowplot", "tidygraph", "benchmarkme", 
                           "parallel", "wesanderson", "scales", "countrycode", 
-                          "doParallel", "foreach"))
+                          "doParallel", "foreach", "sensobol", "sp", "raster","ncdf4"))
 
 # Create custom theme
 theme_AP <- function() {
@@ -75,7 +75,7 @@ theme_AP <- function() {
 
 ```{r read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")}
 
-# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ##############################
+# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
 
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
@@ -2102,6 +2102,626 @@ plot_grid(crop.plots.aquastat, water.plots.aquastat, ncol = 1)
 ```
 
 \newpage
+
+# Uncertainty analysis
+
+```{r functions_data}
+
+# DEFINE FUNCTIONS #############################################################
+
+# Transform columns to qunif with min and max reflecting uncertainty -----------
+
+transform_columns_fun <- function(mat, distr) {
+  
+  for (i in 1:nrow(distr)) {
+    
+    country <- distr$Country[i]
+    
+    min_val <- distr$min[i]
+    max_val <- distr$max[i]
+    
+    mat[[country]] <- qunif(mat[[country]], min = min_val, max = max_val)
+  }
+  
+  return(mat)
+}
+
+## Function to transform longitude and latitude to country.
+# It is borrowed from Andy:
+# https://stackoverflow.com/questions/14334970/convert-latitude-and-longitude-coordinates-to-country-coords2country = function(points) {
+
+coords2country = function(points) {
+  
+  countriesSP <- rworldmap::getMap(resolution = 'low')
+  pointsSP = sp::SpatialPoints(points, proj4string=CRS(proj4string(countriesSP)))
+  indices = sp::over(pointsSP, countriesSP)
+  indices$ADMIN
+  #indices$ISO3 # returns the ISO3 code
+  #indices$continent # returns the continent (6 continent model)
+  #indices$REGION # returns the continent (7 continent model)
+  
+}
+
+# Function to retrieve .nc data from Huang et al 2018 --------------------------
+
+get_huang_fun <- function(nc_file, variable, year) {
+  
+  nc_data <- nc_open(nc_file)
+  
+  # Extract longitude, latitude, and water withdrawal data (withd_elec)
+  lon <- ncvar_get(nc_data, "lon")
+  lat <- ncvar_get(nc_data, "lat")
+  withd_elec <- ncvar_get(nc_data, variable)
+  time <- ncvar_get(nc_data, "month")
+  
+  # Close the NetCDF file after reading
+  nc_close(nc_data)
+  
+  # Earth's radius in meters
+  earth_radius <- units::set_units(6371000, "m")
+  
+  # Function to convert degrees to radians
+  deg_to_rad <- function(deg) {
+    return(deg * pi / 180)
+  }
+  
+  # Calculate the grid area (m²) for each grid cell
+  # Create a data.table with lon and lat values
+  dt <- data.table(lon = lon, lat = lat)
+  
+  # Convert latitudes to radians for area calculation
+  dt[, lat_rad := deg_to_rad(lat)]
+  
+  # Assume the grid cells have equal spacing (this should match your grid resolution)
+  # If you have grid cell dimensions, use them here. Otherwise, use a 0.5 degree grid as an example.
+  delta_lon <- deg_to_rad(0.5)  # Assuming 0.5-degree grid spacing in longitude
+  delta_lat <- deg_to_rad(0.5)  # Assuming 0.5-degree grid spacing in latitude
+  
+  # Calculate the area of each grid cell (in square meters)
+  dt[, area_cell := as.numeric(earth_radius^2 * delta_lon * delta_lat * cos(lat_rad))]
+  
+  # Generate the corresponding year and month for each time step
+  start_year <- 1971
+  start_month <- 1
+  n_months <- length(time)
+  
+  # Generate year and month for each time step
+  years <- rep(start_year:(start_year + (n_months %/% 12)), each = 12, length.out = n_months)
+  months <- rep(1:12, length.out = n_months)
+  
+  # Convert withdrawal from mm/month to km³/month
+  for (month_idx in 1:n_months) {
+    dt[[paste0("year_", years[month_idx], "_month_", months[month_idx])]] <- as.numeric((withd_elec[, month_idx] * 1e-3 * dt$area_cell / 1e9))
+  }
+  
+  # Select only columns that contain 'year_2010'
+  columns_selected <- grep(year, colnames(dt), value = TRUE)
+  
+  # Create a new data.table with only the relevant columns for 2010
+  dt_2010 <- dt[, c("lon", "lat", columns_selected), with = FALSE]
+  
+  countries <- coords2country(dt_2010)
+  
+  dada <- cbind(countries, dt_2010) %>%
+    melt(., measure.vars = columns_selected) %>%
+    .[, sum(value, na.rm = TRUE), countries] %>%
+    .[order(countries)] %>%
+    .[, Country:= countrycode(countries, origin = "country.name", destination = "country.name")]
+  
+  
+  return(dada)
+  
+}
+
+# Function to retrieve .nc4 files from ISIMIP ----------------------------------
+
+get_isimip_fun <- function(nc_file, variable, year, start_year) {
+  
+  nc_data <- nc_open(nc_file)
+  
+  # Extract longitude, latitude, and water withdrawal data
+  lon <- ncvar_get(nc_data, "lon")
+  lat <- ncvar_get(nc_data, "lat")
+  aindww <- ncvar_get(nc_data, variable)
+  time <- ncvar_get(nc_data, "time")
+  
+  # Close the NetCDF file after reading
+  nc_close(nc_data)
+  
+  # Create a grid of lon and lat coordinates
+  lon_lat_grid <- expand.grid(lon = lon, lat = lat)
+  
+  # Earth's radius in meters
+  earth_radius <- units::set_units(6371000, "m")
+  
+  # Function to convert degrees to radians
+  deg_to_rad <- function(deg) {
+    return(deg * pi / 180)
+  }
+  
+  # Calculate the grid area (m²) for each grid cell
+  lon_lat_grid$lat_rad <- deg_to_rad(lon_lat_grid$lat)
+  
+  # Assume the grid cells have equal spacing (match your grid resolution)
+  delta_lon <- deg_to_rad(0.5)  # Assuming 0.5-degree grid spacing in longitude
+  delta_lat <- deg_to_rad(0.5)  # Assuming 0.5-degree grid spacing in latitude
+  
+  # Calculate the area of each grid cell (in square meters)
+  lon_lat_grid$area_cell <- as.numeric(earth_radius^2 * delta_lon * delta_lat * cos(lon_lat_grid$lat_rad))
+  
+  # Convert aindww from kg/m²/s to m³/month
+  # 1 kg of water = 1 liter = 1e-3 m³
+  # Multiply by the number of seconds in a month (30.44 days average)
+  seconds_per_month <- 30.44 * 24 * 3600  # Average month duration in seconds
+  
+  # Generate the corresponding year and month for each time step
+  start_year <- start_year
+  n_months <- length(time)
+  
+  years <- rep(start_year:(start_year + (n_months %/% 12)), each = 12, length.out = n_months)
+  months <- rep(1:12, length.out = n_months)
+  
+  # Convert withdrawal from kg/m²/s to km³/month for each grid cell
+  results <- list()
+  for (month_idx in 1:n_months) {
+    aindww_month <- aindww[, , month_idx]  # Extract the 2D slice (lon x lat) for the given month
+    
+    # Flatten the 2D data to match the grid
+    aindww_month_flat <- as.numeric(aindww_month)
+    
+    # Calculate water withdrawal in km³/month for each grid cell
+    lon_lat_grid[[paste0("year_", years[month_idx], "_month_", months[month_idx])]] <- 
+      aindww_month_flat * 1e-3 * lon_lat_grid$area_cell * seconds_per_month / 1e9  # Convert to km³
+  }
+  
+  # Select only columns that contain the selected year
+  columns_selected <- grep(year, colnames(lon_lat_grid), value = TRUE)
+  
+  # Create a new data table with only the relevant columns for the specified year
+  dt_selected <- lon_lat_grid[, c("lon", "lat", columns_selected)] %>%
+    na.omit()
+  
+  countries <- coords2country(dt_selected)
+  
+  result <- cbind(countries, dt_selected) %>%
+    data.table() %>%
+    melt(., measure.vars = columns_selected) %>%
+    .[, sum(value, na.rm = TRUE), countries] %>%
+    .[order(countries)] %>%
+    .[, Country := countrycode(countries, origin = "country.name", destination = "country.name")]
+  
+  return(result)
+}
+
+```
+
+```{r define_settings_unc}
+
+# DEFINE SETTINGS ##############################################################
+
+N <- 2^20
+type <- "QRN"
+order <- "first"
+matrices <- "A"
+```
+
+
+```{r gww_unc, dependson=c("define_settings_unc", "functions_data")}
+
+# UNCERTAINTY IN IRRIGATION ####################################################
+
+# Read dataset -----------------------------------------------------------------
+
+gww <- fread("global_water_withdrawals.csv") 
+gww[, Country:= countrycode(Country, origin = "country.name", destination = "country.name")]
+
+countries <- unique(gww$Country) 
+
+# Define sample matrix ---------------------------------------------------------
+
+params <- countries
+mat <- data.table(sobol_matrices(matrices = matrices, N = N, params = params, 
+                                 order = order, type = type))
+
+
+# Transform to appropriate distributions ---------------------------------------
+
+mat <- transform_columns_fun(mat = mat, distr = gww)
+
+# Calculate output vector ------------------------------------------------------
+
+y.irrigation <- rowSums(mat)
+hist(y.irrigation)
+```
+
+```{r industry_and_domestic, dependson=c("define_settings_unc", "functions_data")}
+
+# DATASETS WITH INDUSTRY AND DOMESTIC VALUES ###################################
+
+# Aquastat dataset -------------------------------------------------------------
+
+# https://data.apps.fao.org/aquastat/?lang=en&share=f-79eb812e-6cb9-406f-86f2-b7ee414c0ec6
+
+aquastat.ind.dom <- fread("industrial_domestic_aquastat.csv") %>%
+  .[, Country:= countrycode(Area, origin = "country.name", destination = "country.name")]
+
+aquastat.tmp <- aquastat.ind.dom[, .(Country, Variable, Value)] %>%
+  .[Country %in% countries] %>%
+  dcast(., Country ~ Variable, value.var = "Value") %>%
+  setnames(., colnames(.)[2:3], c("Industry", "Domestic")) %>%
+  .[order(Country)]
+
+# Liu dataset ------------------------------------------------------------------
+
+liu.dt <- data.table(read.xlsx("liu_dataset.xlsx")) %>%
+  .[, Country:= countrycode(country, origin = "country.name", destination = "country.name")] %>%
+  .[Country %in% countries]
+
+# Gleick dataset ---------------------------------------------------------------
+
+gleick.dt <- data.table(read.xlsx("gleick_table.xlsx"))
+colnames_numeric <- colnames(gleick.dt)[-c(1,2)]
+gleick.dt <- gleick.dt[, (colnames_numeric):= lapply(.SD, as.numeric), .SDcols = (colnames_numeric)] %>%
+  .[, total.irrigation:= (agricultural / 100) * total.withdrawal] %>%
+  .[, total.industry:= (industrial / 100) * total.withdrawal] %>%
+  .[, total.domestic:= (domestic / 100) * total.withdrawal] %>%
+  .[, Country:= countrycode(country, origin = "country.name", destination = "country.name")] %>%
+  .[Country %in% countries]
+```
+
+```{r industry_datasets, dependson=c("define_settings_unc", "functions_data")}
+
+# INDUSTRY #####################################################################
+
+# Khan et al 2023 dataset ------------------------------------------------------
+
+path.projections <- "./files/khan_et_al_2023/industry"
+list.of.files <- list.files(path.projections, pattern = "\\.csv$")
+combinations <- lapply(list.of.files, function(x) strsplit(x, "_")[[1]][1:4]) %>%
+  do.call(rbind, .) %>%
+  data.frame()
+colnames(combinations) <- c("SSP", "RCP", "Climate", "Use")
+
+# Create parallel cluster ------------------------------------------------------
+
+numCores <- detectCores() * 0.75
+cl <- makeCluster(numCores)
+registerDoParallel(cl)
+
+# Run for loop -----------------------------------------------------------------
+
+result <- foreach(i = 1:length(list.of.files),
+                  .combine = "rbind",
+                  .packages = c("data.table", "countrycode", "tidyverse",
+                                "sp", "rworldmap")) %dopar% {
+                                  
+                                  out <- fread(paste("./files/khan_et_al_2023/industry", 
+                                                     list.of.files[i], sep = "/"))
+                                  
+                                  out <- out[, `:=`(SSP = combinations[i, 1],
+                                                    RCP = combinations[i, 2],
+                                                    Climate = combinations[i, 3],
+                                                    Use = combinations[i, 4])]
+                                  
+                                  Country <- coords2country(out[1:nrow(out), 2:3])
+                                  
+                                  df <- cbind(Country, out) %>%
+                                    .[, Continent := countrycode(Country, origin = "country.name", 
+                                                                 destination = "continent")] %>%
+                                    .[, Country:= countrycode(Country, origin = "country.name", 
+                                                              destination = "country.name")] %>%
+                                    .[, Dataset:= list.of.files[i]]
+                                  
+                                  df
+                                }
+
+# Stop the cluster after the computation ---------------------------------------
+
+stopCluster(cl)
+
+# Arrange Khan data ------------------------------------------------------------
+
+khan.industry <- result[, sum(`2010`), .(Country, Dataset)] %>%
+  .[Country %in% countries] %>%
+  .[, .(min = min(V1), max = max(V1)), Country] %>%
+  .[order(Country)]
+
+# Huang et al 2018 dataset -----------------------------------------------------
+
+path.projections <- "./files/huang_et_al_2018/industrial"
+list.of.files <- list.files(path.projections, pattern = "\\.nc$")
+file <- paste("./files/huang_et_al_2018/industrial", 
+              list.of.files, sep = "/")
+variables <- sub("\\..*", "", list.of.files)
+
+# Retrieve data ----------------------------------------------------------------
+
+out <- list()
+
+for (i in 1:length(file)) {
+  
+  out[[i]] <- get_huang_fun(nc_file = file[[i]], variable = variables[[i]], year = "year_2010")
+}
+
+huang.industry <- data.table(Country = out[[1]]$Country, 
+                             industrial.huang = out[[1]]$V1 + 
+                               out[[2]]$V1 + 
+                               out[[3]]$V1) %>%
+  .[Country %in% countries]
+
+# ISIMIP: Create vector with list of files -------------------------------------
+
+path <- "./files/isimip/industrial"
+list.of.files <- list.files(path)
+files.directory <- paste(path, list.of.files, sep = "/")
+variable <- "aindww"
+year <- "year_2010"
+names.models <- lapply(list.of.files, function(x) sub("_.*", "", x))
+start_year <- 1971
+
+# Create parallel cluster -------------------------------------------------------
+
+numCores <- detectCores() * 0.75
+cl <- makeCluster(numCores)
+registerDoParallel(cl)
+
+# Run for loop -----------------------------------------------------------------
+
+result <- foreach(i = 1:length(files.directory),
+                  .packages = c("data.table", "countrycode", "tidyverse",
+                                "sp", "rworldmap", "ncdf4")) %dopar% {
+                                  
+                  start_year <- ifelse(names.models[i] == "cwatm" | names.models[i] == "h08", 1850,
+                                       ifelse(names.models[i] == "miroc-integ-land", 1901, 1971))
+                                  
+                      get_isimip_fun(nc_file = files.directory[i], 
+                                     variable = variable, 
+                                     year = year, 
+                                     start_year = start_year)
+                                }
+
+# Stop the cluster after the computation ---------------------------------------
+
+stopCluster(cl)
+
+# Arrange data -----------------------------------------------------------------
+
+names(result) <- list.of.files
+
+isimip.industry <- rbindlist(result, idcol = "ID") %>%
+  .[, .(min = min(V1), max = max(V1)), Country] %>%
+  .[Country %in% countries]
+
+
+# Merge all industry datasets --------------------------------------------------
+
+industry.sample.matrix <- merge(khan.industry, aquastat.tmp[, .(Country, Industry)], 
+                                by = "Country") %>%
+  merge(., liu.dt[, .(Country, ind)], by = "Country") %>%
+  merge(., isimip.industry[, .(Country, min, max)], by = "Country") %>%
+  merge(., huang.industry[, .(Country, industrial.huang)], by = "Country") %>%
+  merge(., gleick.dt[, .(Country, total.industry)], by = "Country") %>%
+  melt(., measure.vars = colnames(.)[-1]) %>%
+  .[, .(min = min(value), max = max(value)), Country]
+
+# Define sample matrix ---------------------------------------------------------
+
+params <- industry.sample.matrix$Country
+
+mat <- data.table(sobol_matrices(matrices = matrices, N = N, params = params, 
+                                 order = order, type = type))
+
+# Transform to appropriate distributions ---------------------------------------
+
+mat <- transform_columns_fun(mat = mat, distr = industry.sample.matrix)
+
+# Calculate output vector ------------------------------------------------------
+
+y.industry <- rowSums(mat, na.rm = TRUE)
+hist(y.industry)
+max(y.industry)
+```
+
+```{r domestic_values, dependson=c("define_settings_unc", "functions_data")}
+
+# DOMESTIC #####################################################################
+
+# Khan et al 2023 dataset ------------------------------------------------------
+
+path.projections <- "./files/khan_et_al_2023/domestic"
+list.of.files <- list.files(path.projections, pattern = "\\.csv$")
+combinations <- lapply(list.of.files, function(x) strsplit(x, "_")[[1]][1:4]) %>%
+  do.call(rbind, .) %>%
+  data.frame()
+colnames(combinations) <- c("SSP", "RCP", "Climate", "Use")
+
+# Create parallel cluster -------------------------------------------------------
+
+numCores <- detectCores() * 0.75
+cl <- makeCluster(numCores)
+registerDoParallel(cl)
+
+# Run for loop -----------------------------------------------------------------
+
+result <- foreach(i = 1:length(list.of.files),
+                  .combine = "rbind",
+                  .packages = c("data.table", "countrycode", "tidyverse",
+                                "sp", "rworldmap")) %dopar% {
+                                  
+                                  out <- fread(paste("./files/khan_et_al_2023/domestic", 
+                                                     list.of.files[i], sep = "/"))
+                                  
+                                  out <- out[, `:=`(SSP = combinations[i, 1],
+                                                    RCP = combinations[i, 2],
+                                                    Climate = combinations[i, 3],
+                                                    Use = combinations[i, 4])]
+                                  
+                                  Country <- coords2country(out[1:nrow(out), 2:3])
+                                  
+                                  df <- cbind(Country, out) %>%
+                                    .[, Continent := countrycode(Country, origin = "country.name", 
+                                                                 destination = "continent")] %>%
+                                    .[, Country:= countrycode(Country, origin = "country.name", 
+                                                              destination = "country.name")] %>%
+                                    .[, Dataset := list.of.files[i]]
+                                  
+                                  df
+                                }
+
+# Stop the cluster after the computation ---------------------------------------
+
+stopCluster(cl)
+
+# Arrange Khan data ------------------------------------------------------------
+
+khan.domestic <- result[, sum(`2010`), .(Country, Dataset)] %>%
+  .[Country %in% countries] %>%
+  .[, .(min = min(V1), max = max(V1)), Country] %>%
+  .[order(Country)]
+
+# Huang et al 2018 dataset -----------------------------------------------------
+
+path.projections <- "./files/huang_et_al_2018/domestic"
+list.of.files <- list.files(path.projections, pattern = "\\.nc$")
+file <- paste(path.projections, 
+              list.of.files, sep = "/")
+variables <- sub("\\..*", "", list.of.files)
+
+# Retrieve data ----------------------------------------------------------------
+
+huang.domestic <- get_huang_fun(nc_file = file, variable = variables, year = "year_2010") %>%
+  .[Country %in% countries]
+
+# ISIMIP: Create vector with list of files -------------------------------------
+
+path <- "./files/isimip/domestic"
+list.of.files <- list.files(path)
+files.directory <- paste(path, list.of.files, sep = "/")
+variable <- "adomww"
+year <- "year_2010"
+names.models <- lapply(list.of.files, function(x) sub("_.*", "", x))
+start_year <- 1971
+
+# Create parallel cluster -------------------------------------------------------
+
+numCores <- detectCores() * 0.75
+cl <- makeCluster(numCores)
+registerDoParallel(cl)
+
+# Run for loop -----------------------------------------------------------------
+
+result <- foreach(i = 1:length(files.directory),
+                  .packages = c("data.table", "countrycode", "tidyverse",
+                                "sp", "rworldmap", "ncdf4")) %dopar% {
+                                  
+                                  start_year <- ifelse(names.models[i] == "miroc-integ-land" | 
+                                                         names.models[i] == "cwatm", 1901, 1971)
+                                  
+                                  get_isimip_fun(nc_file = files.directory[i], 
+                                                 variable = variable, 
+                                                 year = year, 
+                                                 start_year = start_year)
+                                }
+
+# Stop the cluster after the computation ---------------------------------------
+
+stopCluster(cl)
+
+# Arrange data -----------------------------------------------------------------
+
+names(result) <- list.of.files
+
+isimip.domestic <- rbindlist(result, idcol = "ID") %>%
+  .[, .(min = min(V1), max = max(V1)), Country] %>%
+  .[Country %in% countries]
+
+
+# Merge all domestic datasets --------------------------------------------------
+
+domestic.sample.matrix <- merge(khan.domestic, 
+                                aquastat.tmp[, .(Country, Domestic)], 
+                                by = "Country") %>%
+  merge(., huang.domestic[, .(Country, V1)], by = "Country") %>%
+  merge(., liu.dt[, .(Country, muni)], by = "Country") %>%
+  merge(., isimip.domestic[, .(Country, min, max)], by = "Country") %>%
+  merge(., gleick.dt[, .(Country, total.domestic)], by = "Country") %>%
+  melt(., measure.vars = colnames(.)[-1]) %>%
+  .[, .(min = min(value), max = max(value)), Country] %>%
+  na.omit()
+
+# Define sample matrix ---------------------------------------------------------
+
+params <- domestic.sample.matrix$Country
+
+mat <- data.table(sobol_matrices(matrices = matrices, N = N, params = params, 
+                                 order = order, type = type))
+
+# Transform to appropriate distributions ---------------------------------------
+
+mat <- transform_columns_fun(mat = mat, distr = domestic.sample.matrix)
+
+# Calculate output vector ------------------------------------------------------
+
+y.domestic<- rowSums(mat, na.rm = TRUE)
+hist(y.domestic)
+```
+
+```{r plot_unc_sectors, dependson=c("domestic_values", "industry_datasets", "gww_unc"), dev = "pdf", fig.height=3, fig.width=4}
+
+# CALCULATE PERCENTAGES ########################################################
+
+percentages.dt <- data.table(irrigation = y.irrigation, 
+                             industry = y.industry, 
+                             domestic = y.domestic) %>%
+  .[, total:= rowSums(.SD)] %>%
+  .[, percent.irrig:= (irrigation / total) * 100] %>%
+  .[, percent.indus:= (industry / total) * 100] %>%
+  .[, percent.domestic:= (domestic / total) * 100]
+
+# Stats ------------------------------------------------------------------------
+
+percentages.dt[, .(min = min(percent.irrig), max = max(percent.irrig))]
+quantile(percentages.dt$percent.irrig, probs = c(0.025, 0.975))
+
+# Plot -------------------------------------------------------------------------
+
+vector.sectors <- c("irrigation", "industry", "domestic")
+
+sectors.plot <- melt(percentages.dt, 
+                     measure.vars = vector.sectors) %>%
+  ggplot(., aes(value)) +
+  geom_histogram(color = "black", fill = "grey") + 
+  facet_wrap(~variable, scale = "free_x", ncol = 4) + 
+  scale_x_continuous(breaks = breaks_pretty(n = 3)) + 
+  labs(x = bquote("Km"^3 * "/yr"), y = "Counts") +
+  theme_AP()
+
+sectors.plot
+
+total.plot <- percentages.dt %>%
+  ggplot(., aes(total)) +
+  geom_histogram(color = "black", fill = "grey") + 
+  scale_x_continuous(breaks = breaks_pretty(n = 3)) +
+  labs(x = bquote("Km"^3 * "/yr"), y = "Counts") +
+  theme_AP()
+
+percentages.plot <- percentages.dt[, .(percent.irrig, percent.indus, percent.domestic)] %>%
+  setnames(., colnames(.), vector.sectors) %>% 
+  melt(., measure.vars = vector.sectors) %>%
+  ggplot(., aes(value, fill = variable)) +
+  labs(x = "Water withdrawal (%)", y = "Count") +
+  scale_fill_discrete(name = "") +
+  geom_histogram(alpha = 0.6, position = "identity") +
+  geom_vline(xintercept = 70, lty = 2) +
+  theme_AP() +
+  theme(legend.position = c(0.45, 0.85))
+
+percentages.plot
+
+bottom <- plot_grid(total.plot, percentages.plot, ncol = 2, labels = c("b", "c"))
+plot_grid(sectors.plot, bottom, ncol = 1, labels = c("a", ""))
+```
+
 
 # Session information
 
