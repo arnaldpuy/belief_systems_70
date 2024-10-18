@@ -42,7 +42,8 @@ knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE)
 sensobol::load_packages(c("openxlsx", "data.table", "tidyverse", "bibliometrix", 
                           "igraph", "ggraph", "cowplot", "tidygraph", "benchmarkme", 
                           "parallel", "wesanderson", "scales", "countrycode", 
-                          "doParallel", "foreach", "sensobol", "sp", "raster","ncdf4"))
+                          "doParallel", "foreach", "sensobol", "sp", "raster","ncdf4", 
+                          "readxl"))
 
 # Create custom theme
 theme_AP <- function() {
@@ -870,7 +871,7 @@ all.names <- graph %>%
 
 ```{r plot_uncertainty_facts, dependson="add_features", fig.height=3.2, fig.width=4.7, dev="pdf"}
 
-# PLOT GRAPH UNCERTAINTIES TURNED INTO FACTS ###################################
+# PLOT GRAPH UNCERTAINTIES TURNED INTO FACTS ####################################
 
 out <- lapply(graph.final, function(x) uncertainty_plot_fun(x))
 
@@ -886,8 +887,6 @@ for (i in names(out)) {
     geom_node_point(aes(color = category, size = degree, shape = classification)) +
     scale_color_manual(values = c("lightgreen", "orange")) +
     scale_shape_discrete(labels = c("Approximate", "Fact", "Lower threshold", "Range", "Upper threshold")) +
-    geom_node_text(aes(label = ifelse(degree >= min(degree.nodes[[i]]$degree), name, NA)), 
-                   repel = TRUE, size = 2.2) +
     labs(x = "", y = "") +
     theme_AP() + 
     theme(axis.text.x = element_blank(), 
@@ -905,7 +904,8 @@ p7
 
 # MERGE PLOTS ##################################################################
 
-plot_grid(p7[[1]], p7[[2]], ncol = 1, labels = "auto")
+plot.uncertainty.paths <- plot_grid(p7[[1]], p7[[2]], ncol = 1, labels = c("e", "f"))
+plot.uncertainty.paths
 ```
 
 
@@ -1050,7 +1050,7 @@ lapply(out, function(x) x[, `no citation` + `no claim`])
 
 # PLOT PROPORTION OF PATHS ENDING IN MODELLING, NO CLAIM AND NO CITATION #######
 
-rbindlist(out, idcol = "belief") %>%
+plot.ending.modelling <- rbindlist(out, idcol = "belief") %>%
   melt(., measure.vars = colnames(.)[-1]) %>%
   ggplot(., aes(belief, value, fill = variable)) +
   geom_bar(stat = "identity", 
@@ -1059,7 +1059,10 @@ rbindlist(out, idcol = "belief") %>%
   scale_fill_manual(values = c("orange","red", "lightgreen", "grey"), 
                     name = "") + 
   theme_AP() + 
-  theme(legend.position = c(0.6, 0.9))
+  theme(legend.position = c(0.6, 0.9), 
+        legend.text = element_text(size = 7))
+
+plot.ending.modelling
 ```
 
 ## Network through time
@@ -1659,7 +1662,6 @@ for (i in 1:length(vec.names.amplification)) {
     geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
                    end_cap = circle(1, "mm")) +
     geom_node_point(size = 1.5, aes(color = nature.claim)) + 
-    geom_node_text(aes(label = name), repel = TRUE, size = 2.2) + 
     scale_color_manual(name = "", 
                        values = selected_colors) +
     theme_AP() +
@@ -1668,11 +1670,51 @@ for (i in 1:length(vec.names.amplification)) {
           axis.ticks.x = element_blank(), 
           axis.text.y = element_blank(), 
           axis.ticks.y = element_blank(), 
-          legend.position = "right") +
-    ggtitle(paste("Paths Activated by", start_node))
+          legend.position = "none", 
+          legend.text = element_text(size = 7.3))
 }
 
 out
+```
+
+```{r plot_ampl_merged, dependson="plot_amplification", fig.height=4.7, fig.width=3.1, dev = "pdf"}
+
+plot.ampl.merged <- plot_grid(out[[1]], 
+                              out[[2]], ncol = 1, 
+                              labels = c("c", "d"))
+
+plot.ampl.merged 
+```
+
+```{r plot_merged_ind_ampl, dependson=c("plot_ampl_merged", "plot_amplification"), fig.width=3, fig.height=5.6, dev="pdf"}
+
+full.amplification.plot <- plot_grid(plot.ending.modelling + 
+                                       guides(fill = guide_legend(nrow = 2, byrow = TRUE)) +
+                                       theme(legend.position = "top"), 
+                                     plot.amplification, 
+                                     rel_heights = c(0.6, 0.4),
+                                     ncol = 1, labels = "auto")
+
+full.amplification.plot
+
+```
+
+```{r plot_merge_amp_modelling, dependson=c("plot_merged_ind_ampl", "plot_ampl_merged")}
+
+full.amplification.plot <- plot_grid(full.amplification.plot, 
+                                     plot.ampl.merged, ncol = 1, 
+                                     rel_heights = c(0.4, 0.6), 
+                                     labels = c("", ""))
+
+full.amplification.plot
+
+```
+
+```{r plot_amplification_uncertainty, dependson=c("plot_merged_ind_ampl", "plot_uncertainty_merged", "plot_proportion_paths", "plot_merge_amp_modelling"), fig.height=6, fig.width=6.2, dev = "pdf"}
+
+
+plot_grid(full.amplification.plot, plot.uncertainty.paths, ncol = 2, rel_widths = c(0.4, 0.6))
+
 ```
 
 
@@ -1732,7 +1774,7 @@ dt.nodes[, .N, topic.final] %>%
   print
 ```
 
-```{r plot_network_complete, dependson="both_networks", dev = "pdf"}
+```{r plot_network_complete, dependson="both_networks", dev = "pdf", fig.height=5.5, fig.width=5.5}
 
 # PLOT MERGED NETWORK ##########################################################
 
@@ -1752,12 +1794,12 @@ ggraph(final.graph, layout = "graphopt") +
         axis.ticks.x = element_blank(), 
         axis.text.y = element_blank(), 
         axis.ticks.y = element_blank(), 
-        legend.position = "right") 
+        legend.position = "top") 
 ```
 
 ## Shared network
 
-```{r plot_shared_networks, dependson="network_metrics", dev = "pdf"}
+```{r plot_shared_networks, dependson="network_metrics", dev = "pdf", fig.height= 3.2, fig.width=4.5}
 
 # PLOT ONLY THE NETWORK OF NODES BEING CITED FOR BOTH BELIEFS ##################
 
@@ -1807,17 +1849,14 @@ intersect.graph.final <- intersect.graph.final %>%
 set.seed(12)
 
 ggraph(intersect.graph.final, layout = "graphopt") + 
-  geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
+  geom_edge_link(arrow = arrow(length = unit(1.3, 'mm')), 
                  end_cap = circle(1, "mm"), 
                  aes(color = topic), 
                  alpha = 0.3) +
   geom_node_point(aes(color = topic, size = degree)) +
-  geom_node_text(aes(label = ifelse(degree >= min(degree.nodes$degree), 
-                                    name, NA)), 
-                 repel = TRUE, 
-                 size = 2.7) +
   scale_edge_color_manual(values = c("brown", "blue"), 
                           name = "") +
+  scale_size_continuous(range = c(0.5, 2.5)) +
   scale_color_manual(name = "", 
                      values = c("purple", "grey")) +
   labs(x = "", y = "") +
@@ -1831,17 +1870,14 @@ ggraph(intersect.graph.final, layout = "graphopt") +
 set.seed(12)
 
 ggraph(intersect.graph.final, layout = "graphopt") + 
-  geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
+  geom_edge_link(arrow = arrow(length = unit(1.3, 'mm')), 
                  end_cap = circle(1, "mm"), 
                  aes(color = topic), 
                  alpha = 0.3) +
   geom_node_point(aes(color = topic, size = betweenness)) +
-  geom_node_text(aes(label = ifelse(betweenness >= min(betweenness.nodes$betweenness), 
-                                    name, NA)), 
-                 repel = TRUE, 
-                 size = 2.7) +
   scale_edge_color_manual(values = c("brown", "blue"), 
                           name = "") +
+  scale_size_continuous(range = c(0.5, 2.5)) +
   scale_color_manual(name = "", 
                      values = c("purple", "grey")) +
   labs(x = "", y = "") +
@@ -2102,6 +2138,61 @@ plot_grid(crop.plots.aquastat, water.plots.aquastat, ncol = 1)
 ```
 
 \newpage
+
+# Estimations compiled by Gleick 2000
+
+```{r past_data_gleick}
+
+# ANALYSIS OF PAST DATA NOT CITED ##############################################
+
+# Read in data -----------------------------------------------------------------
+
+sheets <- excel_sheets("Global_Projections_for_Water_Use.xlsx")
+past.data <- lapply(sheets, function(sheet) 
+  data.table(read.xlsx("Global_Projections_for_Water_Use.xlsx", sheet = sheet)))
+names(past.data) <- sheets
+
+# Falkenmark and Lindh 1974 ----------------------------------------------------
+
+past.data$`Falkenmark and Lindh 1974` %>%
+  .[, fraction := withdrawal / .[Sector == "Total", withdrawal]] %>%
+  .[, fraction2:= `withdrawal.(90%.industrial.reuse)` / .[Sector == "Total", 
+                                                          `withdrawal.(90%.industrial.reuse)`]] %>%
+  print()
+
+# L'vovich 1974 ----------------------------------------------------------------
+
+past.data$`L'vovich 1974` %>%
+  .[sector == "Irrigated agriculture", fraction := withdrawals / 
+      .[sector == "TOTAL", withdrawals]] %>%
+  print()
+
+# L'vovich 1974b ---------------------------------------------------------------
+
+past.data$`L'vovich 1974b` %>%
+  .[sector == "Irrigated agriculture", fraction := withdrawals / 
+      .[sector == "TOTAL", withdrawals]] %>%
+  print()
+
+# Gleick 1997 ------------------------------------------------------------------
+
+past.data$`gleick 1997`[, total:= agriculture + domestic + industrial] %>%
+  .[, fraction.irrigation:= agriculture / total] %>%
+  print()
+
+# Seckler et al 1998 -----------------------------------------------------------
+
+past.data$`seckler et al 1998`[, fraction.irrigation:= agricultural / total] %>%
+  print()
+
+# Falkenmark and Lindh 1974 ----------------------------------------------------
+
+past.data$`Falkenmark and Lindh 1974` %>%
+  .[, fraction := withdrawal / .[Sector == "Total", withdrawal]] %>%
+  print()
+```
+
+\newpage 
 
 # Uncertainty analysis
 
@@ -2739,7 +2830,7 @@ cat("Machine:     "); print(get_cpu()$model_name)
 
 cat("Num cores:   "); print(detectCores(logical = FALSE))
 
-## Return number of threads ----------------------------------------------------
+## Return number of threads ---------------------------------------------------
 
 cat("Num threads: "); print(detectCores(logical = FALSE))
 ```
