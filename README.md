@@ -10,17 +10,16 @@ of all crops consumed worldwide.
 
 ## Abstract
 
-*A key tenet in sustainability science is that irrigation agriculture is crucial 
-to global food and water security because it produces 40\% of all crops and withdraws 
-70\% of all freshwater resources. Here we examine 3.5K documents and demonstrate 
-that the percentages supporting these claims have spread through the literature 
-by unwarranted amplification, with 60-85\% of all citation paths ending in documents 
-that did not produce data supporting the claim or that did not actually make the claim. 
-We also show that global crop production and freshwater withdrawals by irrigation are 
-far more uncertain, respectively ranging between XXX and 50–90\% given current data, 
-and that these ranges are a lower bound on the true uncertainty. Our study highlights 
-the need to scrutinize foundational claims in sustainability science and embrace 
-uncertainty to foster resilient research and policy-making.*
+*A widespread belief in sustainability science is that irrigation agriculture is essential 
+for global food and water security because it produces 40\% of all crops and withdraws 70\% of 
+all freshwater resources. Based on a network citation analysis of 3.5K documents, we demonstrate 
+that this belief has disseminated through the literature with limited empirical support, 
+with 60-80\% of all citation paths leading to documents that either lack supporting data for 
+the claim or do not actually make the claim. According to available data, irrigation’s share 
+of global crop production and water withdrawals is much more uncertain, ranging from 20–50\% 
+and 45–90\% respectively. These ranges should be understood as lower bounds on the true 
+uncertainty. Our study highlights the need to scrutinize foundational claims in sustainability 
+science and embrace uncertainty to support resilient research and policy-making.*
 
 ## Replication
 
