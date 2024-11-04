@@ -41,7 +41,7 @@ theme_AP <- function() {
 
 ## ----read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")--------
 
-# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
+# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ##############################
 
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
@@ -645,8 +645,6 @@ for(i in names(graph.final)) {
                    aes(color = edge_color)) +
     scale_edge_color_manual(values = selected_colors, guide = "none") + 
     geom_node_point(aes(color = nature.claim, size = degree)) +
-    geom_node_text(aes(label = ifelse(degree >= min(degree.nodes[[i]]$degree), name, NA)), 
-                   repel = TRUE, size = 2.2) +
     labs(x = "", y = "") +
     scale_color_manual(name = "", 
                        values = selected_colors) +
@@ -670,8 +668,6 @@ for(i in names(graph.final)) {
                    aes(color = edge_color)) +
     scale_edge_color_manual(values = selected_colors, guide = "none") + 
     geom_node_point(aes(color = nature.claim, size = degree)) +
-    geom_node_text(aes(label = ifelse(nature.claim == "modelling", name, NA)), 
-                   repel = TRUE, size = 2.2) +
     labs(x = "", y = "") +
     scale_color_manual(name = "", 
                        values = selected_colors) +
@@ -722,8 +718,6 @@ for (i in names(graph.final)) {
     geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
                    end_cap = circle(1, "mm")) + 
     geom_node_point(aes(color = document.type, size = degree)) +
-    geom_node_text(aes(label = ifelse(degree >= min(degree.nodes[[i]]$degree), name, NA)), 
-                   repel = TRUE, size = 2.2) +
     labs(x = "", y = "") +
     scale_color_discrete(name = "") +
     theme_AP() + 
@@ -746,8 +740,6 @@ for (i in names(graph.final)) {
     geom_edge_link(arrow = arrow(length = unit(1.8, 'mm')), 
                    end_cap = circle(1, "mm")) + 
     geom_node_point(aes(color = nature.claim)) +
-    geom_node_text(aes(label = ifelse(nature.claim == "modelling", name, NA)), 
-                   repel = TRUE, size = 2.2) +
     labs(x = "", y = "") +
     scale_color_manual(name = "", 
                        values = selected_colors) +
@@ -1126,10 +1118,8 @@ plot.years[[i]] <- ggraph(graph.final[[i]], layout = layout_matrix, algorithm = 
   geom_edge_link(arrow = arrow(length = unit(1.8, "mm")), 
                  end_cap = circle(1, "mm"), 
                  color = "grey", 
-                 alpha = 0.4) + 
+                 alpha = 0.2) + 
   geom_node_point(aes(color = nature.claim, size = degree)) +
-  geom_node_text(aes(label = ifelse(nature.claim == "modelling", name, NA)), 
-                 repel = TRUE, size = 2.5) +
   scale_color_manual(name = "", 
                      values = selected_colors) +
   scale_x_continuous(name = "Year", 
@@ -1153,6 +1143,33 @@ plot.years
 plot.years <- list()
 
 for (i in c("water", "food")) {
+  
+  # Extract vector with names ----------------------------------------------------
+
+  location_aquastat <- graph.final[[i]] %>%
+  activate(nodes) %>%
+  data.frame() %>%
+  pull(name) %>%
+  grep("aquastat", .)
+  
+    location_faostat <- graph.final[[i]] %>%
+    activate(nodes) %>%
+    data.frame() %>%
+    pull(name) %>%
+    grep("faostat", .)
+  
+  # Extract vector with years ----------------------------------------------------
+  
+  v_years <- graph.final[[i]] %>%
+  activate(nodes) %>%
+  data.frame() %>%
+  pull(year) 
+  
+  # Substitute fao aquastat/faostat without year with the oldest citations -----
+  
+  v_years[location_aquastat] <- oldest.aquastat.cite
+  v_years[location_faostat] <- oldest.faostat.cite
+
   
   # Replace NA values in year with random samples from 2000 to 2020 ------------
   
@@ -1211,8 +1228,6 @@ for (i in c("water", "food")) {
                    aes(color = edge_color)) + 
     scale_edge_color_manual(values = selected_colors, guide = "none") +
     geom_node_point(aes(color = nature.claim, size = degree)) +
-    geom_node_text(aes(label = ifelse(nature.claim == "modelling", name, NA)), 
-                   repel = TRUE, size = 2.5) +
     scale_color_manual(name = "", 
                        values = selected_colors) +
     geom_path(data = circle_data, aes(x = x, y = y, group = factor(year)), 
@@ -1276,8 +1291,6 @@ network_through_time_fun <- function(graph, Year, seed) {
     geom_edge_link(arrow = arrow(length = unit(1, 'mm')), 
                    end_cap = circle(0.3, "mm")) + 
     geom_node_point(aes(color = nature.claim, size = degree)) +
-    geom_node_text(aes(label = ifelse(nature.claim == "modelling", name, NA)), 
-                   repel = TRUE, size = 2.2) +
     scale_color_manual(name = "", 
                        values = selected_colors) +
     labs(x = "", y = "") +
@@ -2868,7 +2881,7 @@ percentages.plot <- mat.dt[, .(percent.irrig, percent.indus, percent.domestic)] 
 
 percentages.plot
 
-bottom <- plot_grid(sectors.plot, percentages.plot, ncol = 2, labels = c("a", "b"))
+bottom <- plot_grid(sectors.plot, percentages.plot, ncol = 2, labels = c("d", "e"))
 bottom
 
 
@@ -2893,7 +2906,7 @@ plot.sobol
 ## ----merge_plots_water, dependson=c("sensitivity_water", "plot_unc_water"), dev="pdf"-----------------------
 
 
-water.ua.sa.plot <- plot_grid(bottom, plot.sobol, ncol = 2, labels = c("", "c"), 
+water.ua.sa.plot <- plot_grid(bottom, plot.sobol, ncol = 2, labels = c("", "f"), 
                               rel_widths = c(0.68, 0.32))
 water.ua.sa.plot
 
@@ -3068,6 +3081,16 @@ AB.mat <- final.dt[1:(2 * N)]
 AB.mat[, .(min = min(Y), max = max(Y))]
 quantile(Y, probs = c(0.025, 0.975))
 
+# Proportion of simulations around 70% -----------------------------------------
+
+target.value <- 40  # target value
+epsilon <- 5  # +-5%: tolerance around the target value
+
+# Calculate percentage of simulations within tolerance range
+sum(AB.mat$Y >= (target.value - epsilon) & 
+      AB.mat$Y <= (target.value + epsilon)) / 
+  length(AB.mat$Y) * 100
+
 plot.uncertainty.food <- ggplot(AB.mat, aes(Y)) +
   geom_histogram(fill = "grey", color = "black") +
   geom_vline(xintercept = 40, lty = 2) +
@@ -3075,6 +3098,20 @@ plot.uncertainty.food <- ggplot(AB.mat, aes(Y)) +
   theme_AP()
 
 plot.uncertainty.food
+
+plot.uncertainty.production <- data.table(irrigated = production.irrigation, 
+           rainfed = production.non.irrigation) %>%
+  melt(., measure.vars = colnames(.)) %>%
+  ggplot(., aes(value, fill = variable)) +
+  geom_histogram(position = "identity", alpha = 0.6)  +
+  scale_fill_manual(name = "", values = c("blue", "brown")) +
+  scale_x_continuous(breaks = breaks_pretty(n = 3)) +
+  labs(x = "Tons/ha", y = "Counts") +
+  theme_AP() +
+  theme(legend.position = c(0.55, 0.95), 
+        legend.text = element_text(size = 7))
+
+plot.uncertainty.production
 
 
 ## ----food_sens_analysis, dependson="food_unc", dev = "pdf"--------------------------------------------------
@@ -3107,16 +3144,16 @@ plot.indices.food
 
 ## ----merge.ua.sa.food, dependson=c("food_sens_analysis", "plot_unc_food"), dev="pdf"------------------------
 
-food.ua.sa.plot <- plot_grid(plot.bootstrap.wheat, plot.uncertainty.food, 
-                             plot.indices.food, ncol = 3, labels = c("d", "e", "f"), 
+food.ua.sa.plot <- plot_grid(plot.uncertainty.production, plot.uncertainty.food, 
+                             plot.indices.food, ncol = 3, labels = c("a", "b", "c"), 
                              rel_widths = c(0.32, 0.32, 0.4))
 
 food.ua.sa.plot
 
 
-## ----merge.all.ua.sa, dependson=c("merge.ua.sa.food", "merge_plots_water"), dev="pdf", fig.height=3.5, fig.width=5.5----
+## ----merge.all.ua.sa, dependson=c("merge.ua.sa.food", "merge_plots_water"), dev="pdf", fig.height=3, fig.width=5.5----
 
-plot_grid(water.ua.sa.plot, food.ua.sa.plot, ncol = 1)
+plot_grid(food.ua.sa.plot, water.ua.sa.plot, ncol = 1)
 
 
 ## ----session_information------------------------------------------------------------------------------------
