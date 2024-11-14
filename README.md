@@ -1,6 +1,6 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13885281.svg)](https://doi.org/10.5281/zenodo.13885281)
 
-# The belief in irrigation as essential for food and water security
+# Entrenched beliefs overlook the ambiguous impact of irrigation on global food and water security
 
 [Arnald Puy](https://www.arnaldpuy.com/), Seth N. Linga, Samuel Flinders, Bethan Callow, Grace Allen, Beatrice Cross, Nanxin Wei
 
