@@ -10,22 +10,23 @@ of all crops consumed worldwide.
 
 ## Abstract
 
-*A widespread belief in sustainability science is that irrigation agriculture is essential 
-for global food and water security because it produces 40\% of all crops and withdraws 70\% of 
-all freshwater resources. Based on a network citation analysis of 3.5K documents, we demonstrate 
-that this belief has disseminated through the literature with limited empirical support, 
-with 60-80\% of all citation paths leading to documents that either lack supporting data for 
-the claim or do not actually make the claim. According to available data, irrigation’s share 
-of global crop production and water withdrawals is much more uncertain, ranging from 20–50\% 
-and 45–90\% respectively. These ranges should be understood as lower bounds on the true 
-uncertainty. Our study highlights the need to scrutinize foundational claims in sustainability 
-science and embrace uncertainty to support resilient research and policy-making.*
+*A prevailing notion in sustainability science is that irrigation agriculture 
+underpins global food and water security because it accounts for 40% of crop 
+production and 70% of freshwater withdrawals. Through a network citation analysis 
+of 3,500 documents, we reveal that this belief has spread with limited empirical 
+support: 60-80% of citation paths trace back to sources that lack supporting data 
+or do not explicitly make this claim. Current data suggests that irrigation's 
+contribution to global crop production and water use ranges from 18–50% and 45–90% 
+respectively, and that these ranges likely represent only the lower uncertainty 
+bounds. Our findings underscore the need to rigorously evaluate foundational claims 
+in sustainability science and embrace uncertainty to enhance the resilience of 
+research and policy-making.*
 
 ## Replication
 
 ### Data
 
-This repository contains all the data and files produced in this study.
+This repository contains the data and files produced in this study.
 
 #### Generated data
 
@@ -80,10 +81,33 @@ irrigated at the country level, which  are discussed and analyzed in the manuscr
 As per the data produced by other global models and scholars, we refer the interested reader
 to the following links and repositories:
 
+For irrigation, domestic and industrial water withdrawal:
+
 * [Liu et al 2016](https://pubs.acs.org/doi/10.1021/acs.est.6b01065)
-* [Huang et al 2018](https://hess.copernicus.org/articles/22/2117/2018/).
+* [Huang et al 2018](https://hess.copernicus.org/articles/22/2117/2018/)
 * [Khan et al 2023](https://www.nature.com/articles/s41597-023-02086-2)
 * [ISI-MIP](https://www.isimip.org/)
+* [Gleick 2000](https://books.google.co.uk/books?id=b61zOkAs5NcC&printsec=copyright&redir_esc=y#v=onepage&q&f=false)
+* [Flörke et al 2013](https://www.sciencedirect.com/science/article/abs/pii/S0959378012001318)
+
+For irrigated areas:
+
+* [Siebert et al 2005](https://hess.copernicus.org/articles/9/535/2005/) 
+* [Meier et al 2018](https://hess.copernicus.org/articles/22/1119/2018/)
+* [Salmon et al 2015](https://www.sciencedirect.com/science/article/abs/pii/S0303243415000240?via%3Dihub)
+* [Thenkabail et al 2006](https://www.iwmi.org/Publications/IWMI_Research_Reports/PDF/pub105/RR105.pdf)
+
+For agricultural land:
+
+* [Tubiello et al 2023](https://essd.copernicus.org/articles/15/4997/2023/)
+* [Potapov et al 2021](https://www.nature.com/articles/s43016-021-00429-z)
+
+For average production of wheat / maize:
+
+* [Dadrasi et al 2023](https://www.nature.com/articles/s41598-023-43191-x)
+* [FAO's GAEZ](https://gaez.fao.org/pages/crop-summary)
+* [Mueller et al 2012](https://www.nature.com/articles/nature11420)
+* [IFPRI 2024](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/SWPENT)
 
 ### Code
 
