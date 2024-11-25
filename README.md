@@ -1,8 +1,9 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13885281.svg)](https://doi.org/10.5281/zenodo.13885281)
 
-# Entrenched beliefs overlook the ambiguous impact of irrigation on global food and water security
+# Widely cited global irrigation statistics lack empirical support
 
-[Arnald Puy](https://www.arnaldpuy.com/), Seth N. Linga, Samuel Flinders, Bethan Callow, Grace Allen, Beatrice Cross, Nanxin Wei
+[Arnald Puy](https://www.arnaldpuy.com/), Seth N. Linga, Samuel Flinders, Bethan Callow, 
+Grace Allen, Beatrice Cross, Bruce Lankford, Carmen Aguiló, Nanxin Wei
 
 This study examines the origin, spread and empirical foundations of the belief that 
 irrigation agriculture withdraws 70% of all freshwater available and produces 40% 

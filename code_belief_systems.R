@@ -1,8 +1,8 @@
-## ----setup, include=FALSE-----------------------------------------------------------------------------------
+## ----setup, include=FALSE-----------------------------------------------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE)
 
 
-## ----preliminary, warning=FALSE, message=FALSE--------------------------------------------------------------
+## ----preliminary, warning=FALSE, message=FALSE--------------------------------------------------------------------
 
 #   PRELIMINARY FUNCTIONS ######################################################
 
@@ -39,9 +39,9 @@ theme_AP <- function() {
 }
 
 
-## ----read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")--------
+## ----read_all_datasets, dependson=c("abstract_corpus", "full_text_corpus", "policy_corpus", "split")--------------
 
-# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS ##############################
+# CREATE VECTORS TO READ IN AND CLEAN THE DATASETS #############################
 
 tmp <- list()
 names.files <- c("WORK", "NETWORK")
@@ -195,7 +195,7 @@ network.dt[, (cols_to_change):= lapply(.SD, trimws), .SDcols = (cols_to_change)]
 network.dt[, (cols_to_change):= lapply(.SD, str_squish), .SDcols = (cols_to_change)]
 
 
-## ----descriptive_plots, dependson="read_all_datasets", fig.height=2, fig.width=6.3, dev="pdf"---------------
+## ----descriptive_plots, dependson="read_all_datasets", fig.height=2, fig.width=6.3, dev="pdf"---------------------
 
 # PLOT DESCRIPTIVE STATISTICS ###################################################
 
@@ -261,7 +261,7 @@ plot.supporting.claim <- network.dt[, .N, .(from, topic)] %>%
 plot.supporting.claim
 
 
-## ----network_metrics, dependson="read_all_datasets"---------------------------------------------------------
+## ----network_metrics, dependson="read_all_datasets"---------------------------------------------------------------
 
 # CALCULATE NETWORK METRICS ####################################################
 
@@ -332,7 +332,7 @@ betweenness.nodes
 pagerank.nodes
 
 
-## ----add_features, dependson=c("read_all_datasets", "network_metrics")--------------------------------------
+## ----add_features, dependson=c("read_all_datasets", "network_metrics")--------------------------------------------
 
 # ADD FEATURES TO NODES ########################################################
 
@@ -412,7 +412,7 @@ for (i in names(graph.final)) {
 }
 
 
-## ----export_nodes_edges, dependson="add_features"-----------------------------------------------------------
+## ----export_nodes_edges, dependson="add_features"-----------------------------------------------------------------
 
 # EXPORT NODES AND EDGES #######################################################
 
@@ -434,7 +434,7 @@ for (i in topics) {
 }
 
 
-## ----calculate_proportion, dependson=c("add_features", "read_all_datasets")---------------------------------
+## ----calculate_proportion, dependson=c("add_features", "read_all_datasets")---------------------------------------
 
 # NUMBER OF NODES ##############################################################
 
@@ -492,7 +492,7 @@ plot_grid(plot.claim, bottom, ncol = 1, rel_heights = c(0.6, 0.4))
 
 
 
-## ----calculate_all_paths, dependson=c("add_features", "read_all_datasets")----------------------------------
+## ----calculate_all_paths, dependson=c("add_features", "read_all_datasets")----------------------------------------
 
 # CALCULATE ALL POSSIBLE PATHS #################################################
 
@@ -571,7 +571,7 @@ results.counts <- lapply(graph.final, function(graph)
 stopCluster(cl)
 
 
-## ----results_count_paths, dependson="calculate_all_paths"---------------------------------------------------
+## ----results_count_paths, dependson="calculate_all_paths"---------------------------------------------------------
 
 # SHOW TOTAL NUMBER OF PATHS AND PROPORTION OF PATHS PASSING 
 # THROUGH THE FIVE NODES WITH THE HIGHEST BETWEENNESS ##########################
@@ -582,7 +582,7 @@ lapply(results.counts, function(x) x[[2]] / x[[1]])
 
 
 
-## ----citation_paths_authorities, dependson="add_features"---------------------------------------------------
+## ----citation_paths_authorities, dependson="add_features"---------------------------------------------------------
 
 # CITATION PATHS TO AUTHORITIES ################################################
 
@@ -622,7 +622,7 @@ lapply(1:2, function(topic)
   citation_paths_to_authorities_fun(graph.final[[topic]]))
 
 
-## ----plot_network, dependson=c("add_features", "read_all_datasets"), fig.height=6, fig.width=7, dev = "pdf"----
+## ----plot_network, dependson=c("add_features", "read_all_datasets"), fig.height=6, fig.width=7, dev = "pdf"-------
 
 # PLOT NETWORK #################################################################
 
@@ -754,7 +754,7 @@ for (i in names(graph.final)) {
 p4
 
 
-## ----plot_evolution_nature.claim, dependson="add_features", dev = "pdf", fig.height=2.2, fig.width=5--------
+## ----plot_evolution_nature.claim, dependson="add_features", dev = "pdf", fig.height=2.2, fig.width=5--------------
 
 # PLOT EVOLUTION NATURE CLAIM THROUGH TIME #####################################
 
@@ -788,7 +788,7 @@ plot.network.claims <- plot_grid(bottom, legend, rel_widths = c(0.75, 0.25),
 plot.network.claims
 
 
-## ----function_uncertainty, dependson="add_features"---------------------------------------------------------
+## ----function_uncertainty, dependson="add_features"---------------------------------------------------------------
 
 # COUNT PROPORTION OF NODES THAT STATE AS FACT A CLAIM UTTERED AS UNCERTAIN ####
 
@@ -859,7 +859,7 @@ all.names <- graph %>%
 }
 
 
-## ----plot_uncertainty_facts, dependson="add_features", fig.height=3.2, fig.width=4.7, dev="pdf"-------------
+## ----plot_uncertainty_facts, dependson="add_features", fig.height=3.2, fig.width=4.7, dev="pdf"-------------------
 
 # PLOT GRAPH UNCERTAINTIES TURNED INTO FACTS ####################################
 
@@ -890,7 +890,7 @@ for (i in names(out)) {
 p7
 
 
-## ----plot_uncertainty_merged, dependson="plot_uncertainty_facts", fig.width=4, fig.height=5.5, dev = "pdf"----
+## ----plot_uncertainty_merged, dependson="plot_uncertainty_facts", fig.width=4, fig.height=5.5, dev = "pdf"--------
 
 # MERGE PLOTS ##################################################################
 
@@ -898,7 +898,7 @@ plot.uncertainty.paths <- plot_grid(p7[[1]], p7[[2]], ncol = 1, labels = c("e", 
 plot.uncertainty.paths
 
 
-## ----paths_from_unc_to_facts, dependson="add_features"------------------------------------------------------
+## ----paths_from_unc_to_facts, dependson="add_features"------------------------------------------------------------
 
 # FUNCTION TO CALCULATE ALL PATHS BETWEEN PAIRS OF NODES #######################
 
@@ -952,7 +952,7 @@ for (i in names(all.paths)) {
 }
 
 
-## ----proportion_paths, dependson="add_features"-------------------------------------------------------------
+## ----proportion_paths, dependson="add_features"-------------------------------------------------------------------
 
 # DEFINE FUNCTION ##############################################################
 
@@ -1026,14 +1026,14 @@ out
 
 
 
-## ----sum_no.claim_no.citation, dependson="proportion_paths"-------------------------------------------------
+## ----sum_no.claim_no.citation, dependson="proportion_paths"-------------------------------------------------------
 
 # SUM PROPORTION NO CLAIM AND NO CITATION ######################################
 
 lapply(out, function(x) x[, `no citation` + `no claim`])
 
 
-## ----plot_proportion_paths, dependson="proportion_paths", fig.height=2.4, fig.width=2.5, dev = "pdf"--------
+## ----plot_proportion_paths, dependson="proportion_paths", fig.height=2.4, fig.width=2.5, dev = "pdf"--------------
 
 # PLOT PROPORTION OF PATHS ENDING IN MODELLING, NO CLAIM AND NO CITATION #######
 
@@ -1052,7 +1052,7 @@ plot.ending.modelling <- rbindlist(out, idcol = "belief") %>%
 plot.ending.modelling
 
 
-## ----plot_network_time, dependson="add_features", dev = "pdf"-----------------------------------------------
+## ----plot_network_time, dependson="add_features", dev = "pdf"-----------------------------------------------------
 
 # PLOT NETWORK THROUGH TIME ####################################
 
@@ -1136,7 +1136,7 @@ plot.years[[i]] <- ggraph(graph.final[[i]], layout = layout_matrix, algorithm = 
 plot.years
 
 
-## ----network.time.sam, dependson="add_features", dev = "pdf", fig.height=6.5, fig.width=6.5-----------------
+## ----network.time.sam, dependson="add_features", dev = "pdf", fig.height=6.5, fig.width=6.5-----------------------
 
 # ANOTHER VISUALIZATION FOR YEARS BASED ON POLAR COORDINATES ###################
 
@@ -1247,7 +1247,7 @@ for (i in c("water", "food")) {
 plot.years
 
 
-## ----network_split_years, dependson="add_features"----------------------------------------------------------
+## ----network_split_years, dependson="add_features"----------------------------------------------------------------
 
 # FUNCTION TO PLOT EVOLUTION OF NETWORK THROUGH TIME ###########################
 
@@ -1321,7 +1321,7 @@ for (i in names(graph.final)) {
 }
 
 
-## ----plot_years_more, dependson="network_split_years", fig.height=6, fig.width=7, dev = "pdf"---------------
+## ----plot_years_more, dependson="network_split_years", fig.height=6, fig.width=7, dev = "pdf"---------------------
 
 da <- list()
 
@@ -1342,7 +1342,7 @@ for (i in names(plots.through.time)) {
 da
 
 
-## ----plot_network_split_years, dependson="network_split_years", fig.height=6.5, dev = "pdf"-----------------
+## ----plot_network_split_years, dependson="network_split_years", fig.height=6.5, dev = "pdf"-----------------------
 
 # PLOT #########################################################################
 
@@ -1372,7 +1372,7 @@ for (i in names(plots.through.time)) {
 out.plot
 
 
-## ----analysis_network_paths, dependson="add_features"-------------------------------------------------------
+## ----analysis_network_paths, dependson="add_features"-------------------------------------------------------------
 
 # COUNT THE NUMBER OF NODES WITH PATHS ULTIMATELY LEADING TO NODES
 # THAT DO NOT MAKE THE CITATION ################################################
@@ -1402,7 +1402,7 @@ nodes_to_no_claim_node_fun <- function(g, terminal_nodes) {
 }
 
 
-## ----analysis_paths_nodes, dependson="analysis_network_paths"-----------------------------------------------
+## ----analysis_paths_nodes, dependson="analysis_network_paths"-----------------------------------------------------
 
 # CALCULATE
 
@@ -1456,7 +1456,7 @@ for(i in names(tmp)) {
 out
 
 
-## ----fun_amplification, dependson="add_features"------------------------------------------------------------
+## ----fun_amplification, dependson="add_features"------------------------------------------------------------------
 
 # CALCULATE AMPLIFICATION FUNCTION #############################################
 
@@ -1567,7 +1567,7 @@ tmp2 <- tmp[, .SD, topic] %>%
 tmp2
 
 
-## ----plot_amplification, dependson="fun_amplification", fig.height=2, fig.width=3---------------------------
+## ----plot_amplification, dependson="fun_amplification", fig.height=2, fig.width=3---------------------------------
 
 # PLOT DISTRIBUTION OF AMPLIFICATION INDIXES ###################################
 
@@ -1584,7 +1584,7 @@ plot.amplification <- ggplot(tmp, aes(cai)) +
 plot.amplification
 
 
-## ----plot_amplification_network, dependson="fun_amplification", dev = "pdf"---------------------------------
+## ----plot_amplification_network, dependson="fun_amplification", dev = "pdf"---------------------------------------
 
 # PLOT THE NETWORK OF TOP AMPLIFYING PAPERS ####################################
 
@@ -1675,7 +1675,7 @@ for (i in 1:length(vec.names.amplification)) {
 out
 
 
-## ----plot_ampl_merged, dependson="plot_amplification", fig.height=4.7, fig.width=3.1, dev = "pdf"-----------
+## ----plot_ampl_merged, dependson="plot_amplification", fig.height=4.7, fig.width=3.1, dev = "pdf"-----------------
 
 plot.ampl.merged <- plot_grid(out[[1]], 
                               out[[2]], ncol = 1, 
@@ -1697,7 +1697,7 @@ full.amplification.plot
 
 
 
-## ----plot_merge_amp_modelling, dependson=c("plot_merged_ind_ampl", "plot_ampl_merged")----------------------
+## ----plot_merge_amp_modelling, dependson=c("plot_merged_ind_ampl", "plot_ampl_merged")----------------------------
 
 full.amplification.plot <- plot_grid(full.amplification.plot, 
                                      plot.ampl.merged, ncol = 1, 
@@ -1715,7 +1715,7 @@ plot_grid(full.amplification.plot, plot.uncertainty.paths, ncol = 2, rel_widths 
 
 
 
-## ----both_networks, dependson="network_metrics"-------------------------------------------------------------
+## ----both_networks, dependson="network_metrics"-------------------------------------------------------------------
 
 # CHECK FULL NETWORK AND OVERLAP BETWEEN WATER AND FOOD NETWORK ################
 
@@ -1767,7 +1767,7 @@ dt.nodes[, .N, topic.final] %>%
   print
 
 
-## ----plot_network_complete, dependson="both_networks", dev = "pdf", fig.height=5.5, fig.width=5.5-----------
+## ----plot_network_complete, dependson="both_networks", dev = "pdf", fig.height=5.5, fig.width=5.5-----------------
 
 # PLOT MERGED NETWORK ##########################################################
 
@@ -1790,7 +1790,7 @@ ggraph(final.graph, layout = "graphopt") +
         legend.position = "top") 
 
 
-## ----plot_shared_networks, dependson="network_metrics", dev = "pdf", fig.height= 3.2, fig.width=4.5---------
+## ----plot_shared_networks, dependson="network_metrics", dev = "pdf", fig.height= 3.2, fig.width=4.5---------------
 
 # PLOT ONLY THE NETWORK OF NODES BEING CITED FOR BOTH BELIEFS ##################
 
@@ -1880,7 +1880,7 @@ ggraph(intersect.graph.final, layout = "graphopt") +
         legend.position = "right")
 
 
-## ----aquastat_analysis--------------------------------------------------------------------------------------
+## ----aquastat_analysis--------------------------------------------------------------------------------------------
 
 # STUDY OF AQUASTAT PERCENTAGES ################################################
 
@@ -1906,7 +1906,7 @@ wri <- fread("world_resources_institut_guide_to_the_global_environment_1994.csv"
 wri[, continent:= countrycode(country, origin = "country.name", destination = "continent")]
 
 
-## ----plot_aquastat_analysis, dependson="aquastat_analysis", fig.height=1.8, fig.width=4---------------------
+## ----plot_aquastat_analysis, dependson="aquastat_analysis", fig.height=1.8, fig.width=4---------------------------
 
 # Compare distributions --------------------------------------------------------
 
@@ -1927,7 +1927,7 @@ ggplot(dt.comparison, aes(percentage)) +
   theme_AP()
 
 
-## ----plot_aquastat_analysis_country, dependson="aquastat_analysis", fig.width=3.5---------------------------
+## ----plot_aquastat_analysis_country, dependson="aquastat_analysis", fig.width=3.5---------------------------------
 
 # At the country level ---------------------------------------------------------
 
@@ -1957,7 +1957,7 @@ for(i in names(tmp)) {
 out
 
 
-## ----aquastat_all_years, fig.height=2, fig.width=5, warning=FALSE, dev="pdf"--------------------------------
+## ----aquastat_all_years, fig.height=2, fig.width=5, warning=FALSE, dev="pdf"--------------------------------------
 
 # AQUASTAT ALL YEARS ############################################################
 
@@ -2126,7 +2126,7 @@ plot_grid(crop.plots.aquastat, water.plots.aquastat, ncol = 1)
 
 
 
-## ----past_data_gleick---------------------------------------------------------------------------------------
+## ----past_data_gleick---------------------------------------------------------------------------------------------
 
 # ANALYSIS OF PAST DATA NOT CITED ##############################################
 
@@ -2177,7 +2177,7 @@ past.data$`Falkenmark and Lindh 1974` %>%
   print()
 
 
-## ----functions_data-----------------------------------------------------------------------------------------
+## ----functions_data-----------------------------------------------------------------------------------------------
 
 # DEFINE FUNCTIONS #############################################################
 
@@ -2367,7 +2367,7 @@ get_isimip_fun <- function(nc_file, variable, year, start_year) {
 
 
 
-## ----define_settings_unc------------------------------------------------------------------------------------
+## ----define_settings_unc------------------------------------------------------------------------------------------
 
 # DEFINE SETTINGS ##############################################################
 
@@ -2377,7 +2377,7 @@ order <- "first"
 matrices <- "A"
 
 
-## ----gww_unc, dependson=c("define_settings_unc", "functions_data")------------------------------------------
+## ----gww_unc, dependson=c("define_settings_unc", "functions_data")------------------------------------------------
 
 # UNCERTAINTY IN IRRIGATION ####################################################
 
@@ -2405,7 +2405,7 @@ y.irrigation <- rowSums(mat)
 hist(y.irrigation)
 
 
-## ----industry_and_domestic, dependson=c("define_settings_unc", "functions_data")----------------------------
+## ----industry_and_domestic, dependson=c("define_settings_unc", "functions_data")----------------------------------
 
 # DATASETS WITH INDUSTRY AND DOMESTIC VALUES ###################################
 
@@ -2455,7 +2455,7 @@ folke.dt <- data.table(read.xlsx("mmc4_country.xlsx")) %>%
 
 
 
-## ----industry_datasets, dependson=c("define_settings_unc", "functions_data")--------------------------------
+## ----industry_datasets, dependson=c("define_settings_unc", "functions_data")--------------------------------------
 
 # INDUSTRY #####################################################################
 
@@ -2609,7 +2609,7 @@ hist(y.industry)
 max(y.industry)
 
 
-## ----domestic_values, dependson=c("define_settings_unc", "functions_data")----------------------------------
+## ----domestic_values, dependson=c("define_settings_unc", "functions_data")----------------------------------------
 
 # DOMESTIC #####################################################################
 
@@ -2754,7 +2754,7 @@ y.domestic<- rowSums(mat, na.rm = TRUE)
 hist(y.domestic)
 
 
-## ----water.dt, dependson=c("domestic_values", "industry_datasets", "gww_unc")-------------------------------
+## ----water.dt, dependson=c("domestic_values", "industry_datasets", "gww_unc")-------------------------------------
 
 # CREATE WATER DT ##############################################################
 
@@ -2765,7 +2765,7 @@ water.dt <- data.table(irrigation = y.irrigation,
 fwrite(water.dt, "water.dt.csv")
 
 
-## ----water_unc, dependson="water.dt"------------------------------------------------------------------------
+## ----water_unc, dependson="water.dt"------------------------------------------------------------------------------
 
 # UNCERTAINTY ANALYSIS #########################################################
 
@@ -2826,8 +2826,10 @@ mat.dt[, total:= rowSums(.SD)] %>%
 
 mat.dt[, .(min = min(percent.irrig), max = max(percent.irrig))]
 mat.dt[, .(min = min(irrigation), max = max(irrigation))]
+mat.dt[, .(min = min(total), max = max(total))]
 quantile(mat.dt$percent.irrig, probs = c(0.025, 0.975))
 quantile(mat.dt$irrigation, probs = c(0.025, 0.975))
+quantile(mat.dt$total, probs = c(0.025, 0.975))
 
 # Proportion of simulations around 70% -----------------------------------------
 
@@ -2842,7 +2844,7 @@ sum(AB.mat$percent.irrig >= (target.value - epsilon) &
   length(AB.mat$percent.irrig) * 100
 
 
-## ----plot_unc_water, dependson="water_unc", dev="pdf"-------------------------------------------------------
+## ----plot_unc_water, dependson="water_unc", dev="pdf"-------------------------------------------------------------
 
 # PLOT UNCERTAINTY #############################################################
 
@@ -2886,7 +2888,7 @@ bottom
 
 
 
-## ----sensitivity_water, dependson="water_unc"---------------------------------------------------------------
+## ----sensitivity_water, dependson="water_unc"---------------------------------------------------------------------
 
 # SENSITIVITY ANALYSIS #########################################################
 
@@ -2903,7 +2905,7 @@ plot.sobol
 
 
 
-## ----merge_plots_water, dependson=c("sensitivity_water", "plot_unc_water"), dev="pdf"-----------------------
+## ----merge_plots_water, dependson=c("sensitivity_water", "plot_unc_water"), dev="pdf"-----------------------------
 
 
 water.ua.sa.plot <- plot_grid(bottom, plot.sobol, ncol = 2, labels = c("", "f"), 
@@ -2912,7 +2914,7 @@ water.ua.sa.plot
 
 
 
-## ----food_unc, dev="pdf"------------------------------------------------------------------------------------
+## ----food_unc, dev="pdf"------------------------------------------------------------------------------------------
 
 # AVERAGE YIELD OF IRRIGATED AND RAINFED WHEAT (TONS / HA) #####################
 
@@ -2952,10 +2954,17 @@ spam.irrigated <- fread("spam2020V1r0_global_Y_TI.csv")[, .(ADM0_NAME, WHEA_I, u
   .[, .(mean = mean(WHEA_I) / 1000), Region] %>%
   .[, mean]
 
+# Data from Doll and Siebert 2010 ----------------------------------------------
+
+doll.rainfed <- 2.49
+doll.irrigated <- 3.23
+
 # Merge data and create irrigated and rainfed vector ---------------------------
 
-wheat.dt <- data.table(Y_grain_irr = c(dadrasi.irrigated, mueller.irrigated, gaez.irrigated, spam.irrigated), 
-                       Y_grain_non_irr = c(dadrasi.rainfed, mueller.rainfed, gaez.rainfed, spam.rainfed))
+wheat.dt <- data.table(Y_grain_irr = c(dadrasi.irrigated, mueller.irrigated, 
+                                       gaez.irrigated, spam.irrigated, doll.irrigated), 
+                       Y_grain_non_irr = c(dadrasi.rainfed, mueller.rainfed, 
+                                           gaez.rainfed, spam.rainfed, doll.rainfed))
 
 # Bootstrap wheat production ---------------------------------------------------
 
@@ -3070,7 +3079,7 @@ production.non.irrigation <- mat[, "Y_grain_non_irr"] * mat[, "A_grain_non_irr"]
 Y <- (production.irrigation / (production.irrigation + production.non.irrigation)) * 100
 
 
-## ----plot_unc_food, dependson="food_unc", dev="pdf"---------------------------------------------------------
+## ----plot_unc_food, dependson="food_unc", dev="pdf"---------------------------------------------------------------
 
 # UNCERTAINTY ANALYSIS #########################################################
 
@@ -3114,7 +3123,7 @@ plot.uncertainty.production <- data.table(irrigated = production.irrigation,
 plot.uncertainty.production
 
 
-## ----food_sens_analysis, dependson="food_unc", dev = "pdf"--------------------------------------------------
+## ----food_sens_analysis, dependson="food_unc", dev = "pdf"--------------------------------------------------------
 
 # SENSITIVITY ANALYSIS #########################################################
 
@@ -3142,7 +3151,7 @@ plot.indices.food
   
 
 
-## ----merge.ua.sa.food, dependson=c("food_sens_analysis", "plot_unc_food"), dev="pdf"------------------------
+## ----merge.ua.sa.food, dependson=c("food_sens_analysis", "plot_unc_food"), dev="pdf"------------------------------
 
 food.ua.sa.plot <- plot_grid(plot.uncertainty.production, plot.uncertainty.food, 
                              plot.indices.food, ncol = 3, labels = c("a", "b", "c"), 
@@ -3156,7 +3165,7 @@ food.ua.sa.plot
 plot_grid(food.ua.sa.plot, water.ua.sa.plot, ncol = 1)
 
 
-## ----maize_calculations, dev = "pdf", fig.height=2, fig.width=5.5-------------------------------------------
+## ----maize_calculations, dev = "pdf", fig.height=2, fig.width=5.5-------------------------------------------------
 
 
 # AVERAGE YIELD OF IRRIGATED AND RAINFED MAIZE (TONS / HA) #####################
@@ -3191,10 +3200,17 @@ spam.irrigated <- fread("spam2020V1r0_global_Y_TI.csv")[, .(ADM0_NAME, MAIZ_I, u
   .[, .(mean = mean(MAIZ_I) / 1000), Region] %>%
   .[, mean]
 
+# Data from Doll and Siebert 2010 ----------------------------------------------
+
+doll.rainfed <- 4.11
+doll.irrigated <- 5.68
+
 # Merge data and create irrigated and rainfed vector ---------------------------
 
-maize.dt <- data.table(Y_grain_irr = c(mueller.irrigated, gaez.irrigated, spam.irrigated), 
-                       Y_grain_non_irr = c(mueller.rainfed, gaez.rainfed, spam.rainfed))
+maize.dt <- data.table(Y_grain_irr = c(mueller.irrigated, gaez.irrigated, spam.irrigated, 
+                                       doll.irrigated), 
+                       Y_grain_non_irr = c(mueller.rainfed, gaez.rainfed, spam.rainfed, 
+                                           doll.rainfed))
 
 # Bootstrap wheat production ---------------------------------------------------
 
@@ -3351,9 +3367,455 @@ ggpubr::annotate_figure(final.plot, top = ggpubr::text_grob("Percentage of irrig
 
 
 
-## ----session_information------------------------------------------------------------------------------------
+## ----kilocalories_wheat, echo = FALSE, dev="pdf"------------------------------------------------------------------
 
-# SESSION INFORMATION ###########################################################
+# KILOCALORIES OF IRRIGATED AND RAINFED WHEAT (TONS / HA) #####################
+
+# Data from Dadrasi et al 2023 -------------------------------------------------
+
+dadrasi.irrigated <- fread("irrigated_wheat_data.csv")[!HC27 == "Sum"]$`Irrigated wheat yield (t/ha)`
+  
+dadrasi.rainfed <- fread("rainfed_wheat_data.csv")[!HC27 == "Sum"]$`Rainfed wheat yield (t/ha)`
+  
+# Data from Mueller et al 2012 -------------------------------------------------
+
+mueller.irrigated <- data.table(read.xlsx("mueller_et_al_2012.xlsx")) %>%
+  .[, .(`yield.(t/ha).75%`, `yield.(t/ha).90%`, `yield.(t/ha).100%`)] %>%
+  melt(., measure.vars = colnames(.)) %>%
+  .[, value]
+
+mueller.rainfed <- data.table(read.xlsx("mueller_et_al_2012.xlsx")) %>%
+  .[, .(`yield.(t/ha)`, `yield.(t/ha).50%`)] %>%
+  melt(., measure.vars = colnames(.)) %>%
+  .[, value]
+
+# Data from GAEZ ---------------------------------------------------------------
+
+gaez.irrigated <- data.table(read.xlsx("gaez_wheat_data.xlsx"))[, `Yield.(Irrigated).(tons/ha)`]
+
+gaez.rainfed <- data.table(read.xlsx("gaez_wheat_data.xlsx"))[, `Yield.(tons/ha)`]
+
+# Data from SPAM 2024 ----------------------------------------------------------
+
+spam.rainfed <- fread("spam2020V1r0_global_Y_TR.csv")[, .(ADM0_NAME, WHEA_R, unit)] %>%
+  .[, Region:= countrycode(ADM0_NAME, origin = "country.name", destination = "region")] %>%
+  .[, .(mean = mean(WHEA_R) / 1000), Region] %>%
+  .[, mean]
+
+spam.irrigated <- fread("spam2020V1r0_global_Y_TI.csv")[, .(ADM0_NAME, WHEA_I, unit)] %>%
+  .[, Region:= countrycode(ADM0_NAME, origin = "country.name", destination = "region")] %>%
+  .[, .(mean = mean(WHEA_I) / 1000), Region] %>%
+  .[, mean]
+
+# Data from Doll and Siebert 2010 ----------------------------------------------
+
+doll.rainfed <- 2.49
+doll.irrigated <- 3.23
+
+# Merge data and create irrigated and rainfed vector ---------------------------
+
+wheat.dt <- data.table(Y_grain_irr = c(dadrasi.irrigated, mueller.irrigated, 
+                                       gaez.irrigated, spam.irrigated, doll.irrigated), 
+                       Y_grain_non_irr = c(dadrasi.rainfed, mueller.rainfed, 
+                                           gaez.rainfed, spam.rainfed, doll.rainfed))
+
+# Bootstrap wheat production ---------------------------------------------------
+
+bootstrap.wheat.dt <- replicate(10^4, {
+
+  wheat.dt[sample(.N, replace = TRUE), .(Y_grain_irr = mean(Y_grain_irr), 
+                                         Y_grain_non_irr = mean(Y_grain_non_irr))]
+}, simplify = FALSE) %>%
+  rbindlist(.)
+
+plot.bootstrap.wheat <- bootstrap.wheat.dt %>%
+  melt(., measure.vars = colnames(.)) %>%
+  ggplot(., aes(value, fill = variable)) +
+  geom_histogram(alpha = 0.6, position = "identity") +
+  scale_fill_manual(name = "", labels = c("Irrigated", "Rainfed"), 
+                    values = c("blue", "brown")) +
+  labs(x = "Tons/ha", y = "Counts") +
+  theme_AP() +
+  theme(legend.position = c(0.55, 0.95), 
+        legend.text = element_text(size = 7))
+
+plot.bootstrap.wheat
+  
+# Describe with probability distribution ---------------------------------------
+
+selected_cols <- colnames(wheat.dt)
+dist.estimates <- lapply(selected_cols, function(x) fitdist(bootstrap.wheat.dt[[x]], "norm"))
+names(dist.estimates) <- selected_cols
+lapply(dist.estimates, function(x) denscomp(x))
+
+max(bootstrap.wheat.dt$Y_grain_non_irr)
+
+# Define function --------------------------------------------------------------
+
+out <- lapply(selected_cols, function(x) {
+  
+  data.table(mean.value = dist.estimates[[x]]$estimate[["mean"]], 
+             sd.value = dist.estimates[[x]]$estimate[["sd"]])
+  
+})
+
+names(out) <- selected_cols
+
+for (i in names(out)) {
+  
+  out[[i]][, Fa.norm:= pnorm(min(wheat.dt[[i]]), mean = mean.value, sd = sd.value)] 
+  out[[i]][, Fb.norm:= pnorm(max(wheat.dt[[i]]), mean = mean.value, sd = sd.value)] 
+}
+
+# DATA ON THE EXTENSION OF IRRIGATED AREAS #####################################
+
+meier <- fread("meier.csv")
+col_maps <- colnames(meier)[-c(1:3)]
+irrigated.area.dt <- melt(meier, measure.vars = col_maps) %>%
+  .[, sum(value, na.rm = TRUE) / 10^6, variable]
+
+range.irrigated.areas <- c(min(irrigated.area.dt$V1), max(irrigated.area.dt$V1))
+
+# DATA ON THE EXTENSION OF TOTAL CROPLAND ######################################
+
+tubiello.range <- c(1100, 1900)
+potapov.range <- c(1181.5, 1306.9)
+
+min.total.cropland <- min(c(tubiello.range, potapov.range))
+max.total.cropland <- max(c(tubiello.range, potapov.range))
+
+range.total.cropland <- c(min.total.cropland, max.total.cropland)
+
+# DATA ON EXTENSION RAINFED AREAS ##############################################
+
+rainfed.areas <- range.total.cropland - rev(range.irrigated.areas)
+
+# DEFINE SAMPLE MATRIX ---------------------------------------------------------
+
+# Set parameters of calculation ------------------------------------------------
+
+N <- 2^15
+matrices <- c("A", "B", "AB")
+order = "first"
+first <- "jansen"
+total = "jansen"
+R <- 10^3
+params <- c("Y_grain_irr", "Y_grain_non_irr", "A_grain_irr", "A_grain_non_irr", "kilocalories")
+
+# create sample matrix and transform -------------------------------------------
+
+mat <- sobol_matrices(matrices = matrices, N = N, order = order, params = params)
+
+for (i in colnames(wheat.dt)) {
+  
+  mat[, i] <- qunif(mat[, i], out[[i]]$Fa.norm, out[[i]]$Fb.norm)
+  mat[, i] <- qnorm(mat[, i], out[[i]]$mean.value, out[[i]]$sd.value)
+  
+}
+
+mat[, "A_grain_irr"] <- qunif(mat[, "A_grain_irr"], min(irrigated.area.dt$V1), max(irrigated.area.dt$V1))
+mat[, "A_grain_non_irr"] <- qunif(mat[, "A_grain_non_irr"], rainfed.areas[[1]], rainfed.areas[[2]])
+mat[, "kilocalories"] <- qunif(mat[, "kilocalories"], 213, 382)
+
+# Plot uncertain distributions -------------------------------------------------
+
+data.table(mat) %>%
+  melt(., measure.vars = colnames(.)) %>%
+  ggplot(., aes(value)) +
+  geom_histogram(color = "black", fill = "grey") +
+  facet_wrap(~variable, scales = "free_x") +
+  theme_AP()
+  
+# RUN CALCULATIONS #############################################################
+
+production.irrigation <- mat[, "kilocalories"] * mat[, "Y_grain_irr"] * mat[, "A_grain_irr"] 
+production.non.irrigation <- mat[, "kilocalories"] * mat[, "Y_grain_non_irr"] * mat[, "A_grain_non_irr"]
+Y <- (production.irrigation / (production.irrigation + production.non.irrigation)) * 100
+
+
+## ----plot_unc_food, dependson="food_unc", dev="pdf"---------------------------------------------------------
+
+# UNCERTAINTY ANALYSIS #########################################################
+
+final.dt <- cbind(mat, Y) %>%
+  data.table()
+AB.mat <- final.dt[1:(2 * N)]
+
+AB.mat[, .(min = min(Y), max = max(Y))]
+quantile(Y, probs = c(0.025, 0.975))
+
+# Proportion of simulations around 70% -----------------------------------------
+
+target.value <- 40  # target value
+epsilon <- 5  # +-5%: tolerance around the target value
+
+# Calculate percentage of simulations within tolerance range
+sum(AB.mat$Y >= (target.value - epsilon) & 
+      AB.mat$Y <= (target.value + epsilon)) / 
+  length(AB.mat$Y) * 100
+
+plot.uncertainty.food <- ggplot(AB.mat, aes(Y)) +
+  geom_histogram(fill = "grey", color = "black") +
+  geom_vline(xintercept = 40, lty = 2) +
+  labs(y = "Counts", x = "Percentage kilocalories (wheat)") +
+  theme_AP()
+
+plot.uncertainty.food
+
+plot.uncertainty.production <- data.table(irrigated = production.irrigation, 
+           rainfed = production.non.irrigation) %>%
+  melt(., measure.vars = colnames(.)) %>%
+  ggplot(., aes(value, fill = variable)) +
+  geom_histogram(position = "identity", alpha = 0.6)  +
+  scale_fill_manual(name = "", values = c("blue", "brown")) +
+  scale_x_continuous(breaks = breaks_pretty(n = 3)) +
+  labs(x = "Tons", y = "Counts") +
+  theme_AP() +
+  theme(legend.position = c(0.55, 0.95), 
+        legend.text = element_text(size = 7))
+
+plot.uncertainty.production
+
+
+## ----food_sens_analysis, dependson="food_unc", dev = "pdf"--------------------------------------------------
+
+# SENSITIVITY ANALYSIS #########################################################
+
+# Scatterplot ------------------------------------------------------------------
+
+plot.scatter <- plot_scatter(data = mat, N = N, Y = Y, params = params, method = "bin") +
+  labs(x = "Value", y = "Counts") +
+  theme_AP()
+
+plot.scatter
+
+# Sobol' indices ---------------------------------------------------------------
+
+ind <- sobol_indices(matrices = matrices, Y = Y, N = N, params = params, 
+                     boot = TRUE, R = R, first = first, total = total)
+
+ind
+
+plot.indices.food <- plot(ind) +
+  theme_AP() +
+  theme(legend.position = "none") 
+plot.indices.food
+  
+
+
+## ----merge.ua.sa.food, dependson=c("food_sens_analysis", "plot_unc_food"), dev="pdf"------------------------
+
+food.ua.sa.plot <- plot_grid(plot.uncertainty.food, 
+                             plot.indices.food, ncol = 2, labels = c("a", "b"), 
+                             rel_widths = c(0.3, 0.6))
+
+
+
+## ----kilocalories_wheat_plot, dependson="kilocalories_wheat", dev = "pdf", fig.height=2, fig.width=6--------------
+
+# MERGE UNCERTAINTY AND SENSITIVITY PLOTS --------------------------------------
+
+food.ua.sa.plot
+
+
+## ----kilocalories_maize, echo=FALSE, dev="pdf"--------------------------------------------------------------------
+
+# KILOCALORIES OF IRRIGATED AND RAINFED MAIZE (TONS / HA) #####################
+
+# Data from Mueller et al 2012 -------------------------------------------------
+
+mueller.irrigated <- data.table(read.xlsx("mueller_et_al_2012_maize.xlsx")) %>%
+  .[, .(`yield.(t/ha).75%`, `yield.(t/ha).90%`, `yield.(t/ha).100%`)] %>%
+  melt(., measure.vars = colnames(.)) %>%
+  .[, value]
+
+mueller.rainfed <- data.table(read.xlsx("mueller_et_al_2012_maize.xlsx")) %>%
+  .[, .(`yield.(t/ha)`, `yield.(t/ha).50%`)] %>%
+  melt(., measure.vars = colnames(.)) %>%
+  .[, value]
+
+# Data from GAEZ ---------------------------------------------------------------
+
+gaez.irrigated <- data.table(read.xlsx("gaez_maize_data.xlsx"))[, `Yield.(Irrigated).(tons/ha)`]
+
+gaez.rainfed <- data.table(read.xlsx("gaez_maize_data.xlsx"))[, `Yield.(tons/ha)`]
+
+# Data from SPAM 2024 ----------------------------------------------------------
+
+spam.rainfed <- fread("spam2020V1r0_global_Y_TR.csv")[, .(ADM0_NAME, MAIZ_R, unit)] %>%
+  .[, Region:= countrycode(ADM0_NAME, origin = "country.name", destination = "region")] %>%
+  .[, .(mean = mean(MAIZ_R) / 1000), Region] %>%
+  .[, mean]
+
+spam.irrigated <- fread("spam2020V1r0_global_Y_TI.csv")[, .(ADM0_NAME, MAIZ_I, unit)] %>%
+  .[, Region:= countrycode(ADM0_NAME, origin = "country.name", destination = "region")] %>%
+  .[, .(mean = mean(MAIZ_I) / 1000), Region] %>%
+  .[, mean]
+
+# Merge data and create irrigated and rainfed vector ---------------------------
+
+maize.dt <- data.table(Y_grain_irr = c(mueller.irrigated, gaez.irrigated, spam.irrigated), 
+                       Y_grain_non_irr = c(mueller.rainfed, gaez.rainfed, spam.rainfed))
+
+# Bootstrap wheat production ---------------------------------------------------
+
+bootstrap.maize.dt <- replicate(5000, {
+  
+  maize.dt[sample(.N, replace = TRUE), .(Y_grain_irr = mean(Y_grain_irr), 
+                                         Y_grain_non_irr = mean(Y_grain_non_irr))]
+}, simplify = FALSE) %>%
+  rbindlist(.)
+
+bootstrap.maize.dt %>%
+  melt(., measure.vars = colnames(.)) %>%
+  ggplot(., aes(value, fill = variable)) +
+  geom_histogram(alpha = 0.6, position = "identity") +
+  scale_fill_manual(name = "", values = c("blue", "brown"), 
+                    labels = c("Irrigated", "Rainfed")) +
+  labs(x = "Tons/ha", y = "Counts") +
+  theme_AP() +
+  theme(legend.position = c(0.8, 0.8))
+
+# Describe with probability distribution ---------------------------------------
+
+selected_cols <- colnames(maize.dt)
+dist.estimates <- lapply(selected_cols, function(x) fitdist(bootstrap.maize.dt[[x]], "norm"))
+names(dist.estimates) <- selected_cols
+lapply(dist.estimates, function(x) denscomp(x))
+
+# Define function --------------------------------------------------------------
+
+out <- lapply(selected_cols, function(x) {
+  
+  data.table(mean.value = dist.estimates[[x]]$estimate[["mean"]], 
+             sd.value = dist.estimates[[x]]$estimate[["sd"]])
+  
+})
+
+names(out) <- selected_cols
+
+for (i in names(out)) {
+  
+  out[[i]][, Fa.norm:= pnorm(min(maize.dt[[i]]), mean = mean.value, sd = sd.value)] 
+  out[[i]][, Fb.norm:= pnorm(max(maize.dt[[i]]), mean = mean.value, sd = sd.value)] 
+}
+
+# DATA ON THE EXTENSION OF IRRIGATED AREAS #####################################
+
+meier <- fread("meier.csv")
+col_maps <- colnames(meier)[-c(1:3)]
+irrigated.area.dt <- melt(meier, measure.vars = col_maps) %>%
+  .[, sum(value, na.rm = TRUE) / 10^6, variable]
+
+range.irrigated.areas <- c(min(irrigated.area.dt$V1), max(irrigated.area.dt$V1))
+
+# DATA ON THE EXTENSION OF TOTAL CROPLAND ######################################
+
+tubiello.range <- c(1100, 1900)
+potapov.range <- c(1181.5, 1306.9)
+
+min.total.cropland <- min(c(tubiello.range, potapov.range))
+max.total.cropland <- max(c(tubiello.range, potapov.range))
+
+range.total.cropland <- c(min.total.cropland, max.total.cropland)
+
+# DATA ON EXTENSION RAINFED AREAS ##############################################
+
+rainfed.areas <- range.total.cropland - rev(range.irrigated.areas)
+
+# DEFINE SAMPLE MATRIX ---------------------------------------------------------
+
+# Set parameters of calculation ------------------------------------------------
+
+N <- 2^15
+matrices <- c("A", "B", "AB")
+order = "first"
+first <- "jansen"
+total = "jansen"
+R <- 10^3
+params <- c("Y_grain_irr", "Y_grain_non_irr", "A_grain_irr", "A_grain_non_irr", "kilocalories")
+
+# create sample matrix and transform -------------------------------------------
+
+mat <- sobol_matrices(matrices = matrices, N = N, order = order, params = params)
+
+for (i in colnames(wheat.dt)) {
+  
+  mat[, i] <- qunif(mat[, i], out[[i]]$Fa.norm, out[[i]]$Fb.norm)
+  mat[, i] <- qnorm(mat[, i], out[[i]]$mean.value, out[[i]]$sd.value)
+  
+}
+
+mat[, "A_grain_irr"] <- qunif(mat[, "A_grain_irr"], min(irrigated.area.dt$V1), max(irrigated.area.dt$V1))
+mat[, "A_grain_non_irr"] <- qunif(mat[, "A_grain_non_irr"], rainfed.areas[[1]], rainfed.areas[[2]])
+mat[, "kilocalories"] <- qunif(mat[, "kilocalories"], 356, 380)
+
+# Plot uncertain distributions -------------------------------------------------
+
+data.table(mat) %>%
+  melt(., measure.vars = colnames(.)) %>%
+  ggplot(., aes(value)) +
+  geom_histogram(color = "black", fill = "grey") +
+  facet_wrap(~variable, scales = "free_x") +
+  theme_AP()
+
+# RUN CALCULATIONS #############################################################
+
+production.irrigation <- mat[, "kilocalories"] * mat[, "Y_grain_irr"] * mat[, "A_grain_irr"] 
+production.non.irrigation <- mat[, "kilocalories"] * mat[, "Y_grain_non_irr"] * mat[, "A_grain_non_irr"]
+Y <- (production.irrigation / (production.irrigation + production.non.irrigation)) * 100
+
+# UNCERTAINTY ANALYSIS #########################################################
+
+final.dt <- cbind(mat, Y) %>%
+  data.table()
+AB.mat <- final.dt[1:(2 * N)]
+
+AB.mat[, .(min = min(Y), max = max(Y))]
+quantile(Y, probs = c(0.025, 0.975))
+
+plot.uncertainty <- ggplot(AB.mat, aes(Y)) +
+  geom_histogram(fill = "grey", color = "black") +
+  geom_vline(xintercept = 40, lty = 2) +
+  labs(y = "Counts", x = "Percentage kilocalories (maize)") +
+  theme_AP()
+
+plot.uncertainty
+
+# SENSITIVITY ANALYSIS #########################################################
+
+# Scatterplot ------------------------------------------------------------------
+
+plot.scatter <- plot_scatter(data = mat, N = N, Y = Y, params = params, method = "bin") +
+  labs(x = "Value", y = "Percentage") +
+  theme_AP()
+
+plot.scatter
+
+# Sobol' indices ---------------------------------------------------------------
+
+ind <- sobol_indices(matrices = matrices, Y = Y, N = N, params = params, 
+                     boot = TRUE, R = R, first = first, total = total)
+
+ind
+
+plot.indices <- plot(ind) +
+  theme_AP() +
+  theme(legend.position = c(0.8, 0.8))
+
+
+
+## ----kilocalories_maize_plot, dependson="kilocalories_maize", dev = "pdf", fig.height=2, fig.width=6--------------
+
+# MERGE UNCERTAINTY AND SENSITIVITY PLOTS --------------------------------------
+
+plot_grid(plot.uncertainty, plot.indices, ncol = 2, labels = "auto", 
+          rel_widths = c(0.35, 0.65))
+
+
+## ----session_information------------------------------------------------------------------------------------------
+
+# SESSION INFORMATION ##########################################################
 
 sessionInfo()
 
