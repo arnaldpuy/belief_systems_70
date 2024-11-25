@@ -11,17 +11,17 @@ of all crops consumed worldwide.
 
 ## Abstract
 
-*A prevailing notion in sustainability science is that irrigation agriculture 
-underpins global food and water security because it accounts for 40% of crop 
-production and 70% of freshwater withdrawals. Through a network citation analysis 
-of 3,500 documents, we reveal that this belief has spread with limited empirical 
-support: 60-80% of citation paths trace back to sources that lack supporting data 
-or do not explicitly make this claim. Current data suggests that irrigation's 
-contribution to global crop production and water use ranges from 18–50% and 45–90% 
-respectively, and that these ranges likely represent only the lower uncertainty 
-bounds. Our findings underscore the need to rigorously evaluate foundational claims 
-in sustainability science and embrace uncertainty to enhance the resilience of 
-research and policy-making.*
+*A prevailing notion in sustainability science is that irrigation agriculture underpins 
+global food and water security because it accounts for 40% of crop production and 70% 
+of freshwater withdrawals. Through a network citation analysis of 3,500 documents, 
+we reveal that this belief has spread through the literature with minimal empirical 
+support: 60–80% of all citation paths lead to sources that lack supporting data or 
+that do not even contain the 40% or 70% numbers. We also prove that these figures 
+mask a much more uncertain contribution of irrigation to global crop production 
+and water withdrawals, which can lie anywhere between 18–50% and 45–90% respectively. 
+These ranges should be understood as lower bounds on the true uncertainty. 
+Our findings underscore the need to rigorously evaluate foundational claims in 
+sustainability science and embrace ambiguity to produce robust research and policy-making.*
 
 ## Replication
 
