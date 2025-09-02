@@ -2,8 +2,8 @@
 
 # Widely cited global irrigation statistics lack empirical support
 
-[Arnald Puy](https://www.arnaldpuy.com/), Seth N. Linga, Samuel Flinders, Bethan Callow, 
-Grace Allen, Beatrice Cross, Bruce Lankford, Carmen Aguiló, Nanxin Wei
+[Arnald Puy](https://www.arnaldpuy.com/), Seth N. Linga, Nanxin Wei, Samuel Flinders, Bethan Callow, 
+Grace Allen, Beatrice Cross, Carmen Aguiló-Rivera, and Bruce Lankford
 
 This study examines the origin, spread and empirical foundations of the belief that 
 irrigation agriculture withdraws 70% of all freshwater available and produces 40% 

@@ -30,7 +30,7 @@ fontsize: 11pt
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE)
+knitr::opts_chunk$set(echo = TRUE, dev = "tikz", cache = TRUE, message = FALSE)
 ```
 
 \newpage
@@ -922,6 +922,9 @@ for (i in names(out)) {
     scale_shape_discrete(labels = c("Approximate", "Fact", "Lower threshold", "Range", "Upper threshold")) +
     labs(x = "", y = "") +
     theme_AP() + 
+    guides(size = guide_legend(order = 1),   
+           shape = guide_legend(order = 2),
+           color = guide_legend(order = 3)) +
     theme(axis.text.x = element_blank(), 
           axis.ticks.x = element_blank(), 
           axis.text.y = element_blank(), 
